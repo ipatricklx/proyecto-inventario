@@ -1,9 +1,16 @@
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr'
 
-// Usamos el signo "!" al final para decirle a TypeScript que estamos 
-// seguros de que estas variables existen en nuestro archivo .env.local
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Creamos una variable fuera de la función para guardar la instancia
+let client: ReturnType<typeof createBrowserClient> | undefined;
 
-// Creamos y exportamos el cliente para usarlo en toda la aplicación
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = (() => {
+  // Si ya existe el cliente en el navegador, no creamos otro, devolvemos el mismo
+  if (client) return client;
+
+  client = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  return client;
+})();

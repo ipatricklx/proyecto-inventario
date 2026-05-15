@@ -1,35 +1,93 @@
-import { supabase } from "../lib/supabase";
+'use client';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
-export default async function Home() {
-  // Intentamos traer todos los registros de tu tabla 'equipos'
-  const { data: equipos, error } = await supabase.from("equipos").select("*");
+export default function HomePage() {
+  const [equipos, setEquipos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    getEquipos();
+  }, []);
+
+  async function getEquipos() {
+    const { data } = await supabase.from('equipos').select('*');
+    if (data) setEquipos(data);
+    setLoading(false);
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/login';
+  };
 
   return (
-    <main className="p-10 font-sans">
-      <h1 className="text-3xl font-bold mb-6">Estado de la Conexión</h1>
-
-      {/* Si hay un error, mostramos una alerta roja */}
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          <strong className="font-bold">¡Error de conexión! </strong>
-          <span className="block sm:inline">{error.message}</span>
+    <div className="min-h-screen bg-gray-50">
+      {/* BARRA SUPERIOR */}
+      <nav className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16 items-center">
+            <h1 className="text-xl font-bold text-blue-600">🏥 Inventario Hospital</h1>
+            <button 
+              onClick={handleLogout}
+              className="text-sm font-medium text-red-600 hover:text-red-800 transition-colors"
+            >
+              Cerrar Sesión
+            </button>
+          </div>
         </div>
-      )}
+      </nav>
 
-      {/* Si NO hay error y la variable equipos existe, mostramos una alerta verde */}
-      {!error && equipos && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-          <strong className="font-bold">¡Conectado a Supabase con éxito! </strong>
-          <span className="block sm:inline">Tu código se está comunicando con la base de datos.</span>
+      {/* CONTENIDO PRINCIPAL */}
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="mb-8 flex justify-between items-end">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">Panel de Equipos</h2>
+            <p className="text-gray-500">Listado general de activos tecnológicos</p>
+          </div>
+          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-shadow shadow-sm font-medium">
+            + Nuevo Equipo
+          </button>
         </div>
-      )}
 
-      <h2 className="text-xl font-semibold mb-2">Datos en la tabla "equipos":</h2>
-      
-      {/* Mostramos lo que devolvió la base de datos en formato JSON */}
-      <pre className="bg-gray-800 text-green-400 p-4 rounded overflow-auto">
-        {JSON.stringify(equipos, null, 2)}
-      </pre>
-    </main>
+        {/* TABLA */}
+        <div className="bg-white shadow-md rounded-xl overflow-hidden border border-gray-100">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Cod. Patrimonio</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Tipo</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Marca/Modelo</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Serie</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {loading ? (
+                <tr><td colSpan={5} className="text-center py-10 text-gray-400">Cargando equipos...</td></tr>
+              ) : equipos.length === 0 ? (
+                <tr><td colSpan={5} className="text-center py-10 text-gray-400">No hay equipos registrados.</td></tr>
+              ) : (
+                equipos.map((equipo) => (
+                  <tr key={equipo.id_equipo} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">{equipo.cod_patrimonio}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{equipo.tipo_equipo}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{equipo.marca} - {equipo.modelo}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{equipo.numero_serie}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${equipo.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {equipo.activo ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
   );
 }
