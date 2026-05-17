@@ -1,93 +1,56 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
 
-export default function HomePage() {
-  const [equipos, setEquipos] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
-
-  useEffect(() => {
-    getEquipos();
-  }, []);
-
-  async function getEquipos() {
-    const { data } = await supabase.from('equipos').select('*');
-    if (data) setEquipos(data);
-    setLoading(false);
-  }
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.href = '/login';
-  };
-
+export default function DashboardPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* BARRA SUPERIOR */}
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <h1 className="text-xl font-bold text-blue-600">🏥 Inventario Hospital</h1>
-            <button 
-              onClick={handleLogout}
-              className="text-sm font-medium text-red-600 hover:text-red-800 transition-colors"
-            >
-              Cerrar Sesión
-            </button>
-          </div>
-        </div>
-      </nav>
+    <div className="animate-fadeIn">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">Módulo Principal / Dashboard</h2>
+        <p className="text-gray-500 text-sm">Resumen analítico de la infraestructura tecnológica del hospital.</p>
+      </div>
 
-      {/* CONTENIDO PRINCIPAL */}
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="mb-8 flex justify-between items-end">
+      {/* TARJETAS DE EJEMPLO DE CAPACIDAD (Próximamente dinámicas) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">Panel de Equipos</h2>
-            <p className="text-gray-500">Listado general de activos tecnológicos</p>
+            <p className="text-sm font-medium text-gray-400 uppercase">Total Equipos</p>
+            <p className="text-2xl font-bold text-gray-800 mt-1">--</p>
           </div>
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-shadow shadow-sm font-medium">
-            + Nuevo Equipo
-          </button>
+          <span className="text-3xl bg-blue-50 p-3 rounded-lg text-blue-600">💻</span>
         </div>
 
-        {/* TABLA */}
-        <div className="bg-white shadow-md rounded-xl overflow-hidden border border-gray-100">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Cod. Patrimonio</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Tipo</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Marca/Modelo</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Serie</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {loading ? (
-                <tr><td colSpan={5} className="text-center py-10 text-gray-400">Cargando equipos...</td></tr>
-              ) : equipos.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-10 text-gray-400">No hay equipos registrados.</td></tr>
-              ) : (
-                equipos.map((equipo) => (
-                  <tr key={equipo.id_equipo} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">{equipo.cod_patrimonio}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{equipo.tipo_equipo}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{equipo.marca} - {equipo.modelo}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{equipo.numero_serie}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${equipo.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {equipo.activo ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-400 uppercase">Operativos</p>
+            <p className="text-2xl font-bold text-green-600 mt-1">--</p>
+          </div>
+          <span className="text-3xl bg-green-50 p-3 rounded-lg text-green-600">✅</span>
         </div>
-      </main>
+
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-400 uppercase">Periféricos</p>
+            <p className="text-2xl font-bold text-gray-800 mt-1">--</p>
+          </div>
+          <span className="text-3xl bg-purple-50 p-3 rounded-lg text-purple-600">🖨️</span>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-400 uppercase">Alertas / Bajas</p>
+            <p className="text-2xl font-bold text-red-600 mt-1">--</p>
+          </div>
+          <span className="text-3xl bg-red-50 p-3 rounded-lg text-red-600">⚠️</span>
+        </div>
+      </div>
+
+      {/* CONTENEDOR EN BLANCO */}
+      <div className="bg-white border border-gray-200 rounded-xl p-12 text-center shadow-sm">
+        <div className="text-4xl mb-3">📊</div>
+        <h3 className="text-lg font-bold text-gray-700">Gráficos Estadísticos</h3>
+        <p className="text-gray-400 text-sm max-w-md mx-auto mt-1">
+          Aquí implementaremos próximamente los reportes visuales en tiempo real de Supabase (Equipos por área, marcas más usadas, etc.).
+        </p>
+      </div>
     </div>
   );
 }
