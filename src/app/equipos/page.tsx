@@ -82,6 +82,10 @@ export default function EquiposPage() {
           <h2 className="text-2xl font-bold text-gray-800">Panel de Equipos</h2>
           <p className="text-gray-500 text-sm">Directorio patrimonial y control de estaciones de trabajo vigentes.</p>
         </div>
+            <Link href="/equipos/papelera" className="bg-gray-100 text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-200 transition-all font-medium text-sm flex items-center gap-2 shadow-sm">
+            <span>🗑️</span> Ver Papelera
+            </Link>
+
         <Link href="/nuevo-equipo" className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-all shadow-md font-bold text-sm flex items-center gap-2">
           <span>➕</span> Nuevo Equipo
         </Link>

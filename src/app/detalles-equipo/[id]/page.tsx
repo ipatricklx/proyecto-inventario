@@ -14,10 +14,14 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
   }, [id]);
 
   async function getDatos() {
-    // 1. Obtener detalles del equipo con su ubicación
+    // 1. Obtener detalles del equipo con su ubicación y usuario asignado
     const { data: equipoData } = await supabase
       .from('equipos')
-      .select('*, ubicaciones(servicio, area)')
+      .select(`
+        *, 
+        ubicaciones(servicio, area),
+        usuarios(nombres, apellidos, anexo, email_institucional)
+      `)
       .eq('id_equipo', Number(id))
       .single();
 
@@ -28,7 +32,7 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
       .from('estados_equipo')
       .select('*')
       .eq('id_equipo', Number(id))
-      .order('fecha', { ascending: false }); // Asumiendo que la columna se llama 'fecha'
+      .order('fecha', { ascending: false });
 
     if (historialData) setHistorial(historialData);
     
@@ -102,6 +106,49 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
               <div><p className="text-gray-500">Sistema Operativo</p><p className="font-medium">{equipo.sistema_operativo || 'N/A'}</p></div>
               <div><p className="text-gray-500">Antivirus</p><p className="font-medium">{equipo.antivirus || 'N/A'}</p></div>
               <div className="col-span-2"><p className="text-gray-500">Clave VNC (Acceso Remoto)</p><p className="font-mono bg-gray-100 px-2 py-1 inline-block rounded text-red-600 tracking-wider">{equipo.clave_vnc || 'No registrada'}</p></div>
+            </div>
+          </div>
+
+          {/* NUEVA TARJETA: ASIGNACIÓN Y ACCESOS */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mt-6">
+            <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">👤 Asignación y Permisos</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Card de Usuario */}
+              <div>
+                <p className="text-sm text-gray-500 font-bold mb-2">Usuario Responsable</p>
+                {equipo.usuarios ? (
+                  <div className="flex items-center gap-3 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                    <div className="text-3xl">👨‍💻</div>
+                    <div>
+                      <p className="font-bold text-blue-900">{equipo.usuarios.apellidos}, {equipo.usuarios.nombres}</p>
+                      <p className="text-xs text-blue-700">Anexo: {equipo.usuarios.anexo || 'No registrado'}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-gray-500 italic text-sm">
+                    Equipo libre / En almacén (Sin usuario asignado)
+                  </div>
+                )}
+              </div>
+
+              {/* Badges de Sistemas */}
+              <div>
+                <p className="text-sm text-gray-500 font-bold mb-2">Sistemas Instalados</p>
+                <div className="flex flex-wrap gap-2">
+                  {equipo.tiene_sap && <span className="bg-blue-100 text-blue-800 border border-blue-200 text-xs px-2.5 py-1 rounded-md font-bold">✔️ SAP</span>}
+                  {equipo.tiene_ses && <span className="bg-green-100 text-green-800 border border-green-200 text-xs px-2.5 py-1 rounded-md font-bold">✔️ SES</span>}
+                  {equipo.tiene_winepi && <span className="bg-purple-100 text-purple-800 border border-purple-200 text-xs px-2.5 py-1 rounded-md font-bold">✔️ WINEPI</span>}
+                  {equipo.tiene_sinadef && <span className="bg-red-100 text-red-800 border border-red-200 text-xs px-2.5 py-1 rounded-md font-bold">✔️ SINADEF</span>}
+                  {equipo.en_dominio && <span className="bg-slate-100 text-slate-800 border border-slate-300 text-xs px-2.5 py-1 rounded-md font-bold">🖥️ Dominio Local</span>}
+                  {equipo.tiene_internet && <span className="bg-teal-100 text-teal-800 border border-teal-200 text-xs px-2.5 py-1 rounded-md font-bold">🌐 Internet Abierta</span>}
+                  
+                  {(!equipo.tiene_sap && !equipo.tiene_ses && !equipo.tiene_winepi && !equipo.tiene_sinadef && !equipo.en_dominio && !equipo.tiene_internet) && (
+                    <span className="text-gray-400 italic text-sm">Equipo base (Sin configuraciones especiales)</span>
+                  )}
+                </div>
+              </div>
+
             </div>
           </div>
 

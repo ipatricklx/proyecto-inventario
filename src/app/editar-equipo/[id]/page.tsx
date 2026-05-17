@@ -10,7 +10,8 @@ export default function EditarEquipoPage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [ubicaciones, setUbicaciones] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'general' | 'red' | 'software'>('general');
+  const [usuarios, setUsuarios] = useState<any[]>([]); // 👈 Nuevo estado
+  const [activeTab, setActiveTab] = useState<'general' | 'red' | 'software' | 'sistemas'>('general');
 
   const [cambiarEstado, setCambiarEstado] = useState(false);
   const [nuevoEstado, setNuevoEstado] = useState<string>(''); 
@@ -20,7 +21,11 @@ export default function EditarEquipoPage({ params }: { params: Promise<{ id: str
     cod_patrimonio: '', origen_patrimonio: 'VERDE', tipo_equipo: '', marca: '', modelo: '',
     numero_serie: '', id_ubicacion: '', procesador: '', memoria_ram: '', almacenamiento: '',
     direccion_ip: '', direccion_mac: '', nombre_red_pc: '', clave_vnc: '', sistema_operativo: '',
-    antivirus: '', activo: true, estado: 'OPERATIVO'
+    antivirus: '', activo: true, estado: 'OPERATIVO',
+    
+    // 👈 Nuevos campos
+    id_usuario: '', tiene_sap: false, tiene_ses: false, tiene_winepi: false, 
+    tiene_sinadef: false, tiene_internet: false, en_dominio: false
   });
 
   useEffect(() => {
@@ -28,14 +33,31 @@ export default function EditarEquipoPage({ params }: { params: Promise<{ id: str
   }, [id]);
 
   async function getDatos() {
+    // Cargar Ubicaciones
     const { data: ubis } = await supabase.from('ubicaciones').select('*');
     if (ubis) setUbicaciones(ubis);
 
+    // 👈 Cargar Usuarios
+    const { data: dataUsers } = await supabase.from('usuarios').select('*').order('apellidos');
+    if (dataUsers) setUsuarios(dataUsers);
+
+    // Cargar Equipo Actual
     const { data: equipo, error } = await supabase.from('equipos').select('*').eq('id_equipo', Number(id)).single();
     
     if (equipo) {
       const datosSeguros = { ...equipo };
-      Object.keys(datosSeguros).forEach(key => { if (datosSeguros[key] === null) datosSeguros[key] = ''; });
+      // Convertir nulls a strings vacíos para los inputs
+      Object.keys(datosSeguros).forEach(key => { 
+        if (datosSeguros[key] === null) datosSeguros[key] = ''; 
+      });
+      // Asegurarse de que los booleanos sean booleanos reales
+      datosSeguros.tiene_sap = Boolean(equipo.tiene_sap);
+      datosSeguros.tiene_ses = Boolean(equipo.tiene_ses);
+      datosSeguros.tiene_winepi = Boolean(equipo.tiene_winepi);
+      datosSeguros.tiene_sinadef = Boolean(equipo.tiene_sinadef);
+      datosSeguros.tiene_internet = Boolean(equipo.tiene_internet);
+      datosSeguros.en_dominio = Boolean(equipo.en_dominio);
+
       setFormData(datosSeguros as any);
     } else if (error) {
       alert('Error al cargar el activo.'); 
@@ -50,8 +72,11 @@ export default function EditarEquipoPage({ params }: { params: Promise<{ id: str
     setSaving(true);
 
     const datosActualizar = { ...formData };
+    
+    // Manejo de nulos para base de datos
     if (!datosActualizar.id_ubicacion) datosActualizar.id_ubicacion = null as any;
-
+    if (!datosActualizar.id_usuario) datosActualizar.id_usuario = null as any; // 👈 Nulo si no hay usuario
+    
     if (typeof datosActualizar.direccion_ip === 'string' && datosActualizar.direccion_ip.trim() === '') {
       datosActualizar.direccion_ip = null as any;
     }
@@ -95,6 +120,11 @@ export default function EditarEquipoPage({ params }: { params: Promise<{ id: str
     }
   };
 
+  // 👈 Función para manejar los checkboxes booleanos
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.checked });
+  };
+
   if (loading) return <div className="text-center py-20 text-gray-500 font-medium">Abriendo expediente del activo...</div>;
 
   return (
@@ -109,10 +139,11 @@ export default function EditarEquipoPage({ params }: { params: Promise<{ id: str
         </span>
       </div>
 
-      <div className="flex border-b border-gray-200 mb-8 space-x-4">
-        <button type="button" onClick={() => setActiveTab('general')} className={`py-2 px-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'general' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>1. Datos Generales y Estado</button>
-        <button type="button" onClick={() => setActiveTab('red')} className={`py-2 px-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'red' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>2. Red y Hardware</button>
-        <button type="button" onClick={() => setActiveTab('software')} className={`py-2 px-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'software' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>3. Software y Conectividad</button>
+      <div className="flex border-b border-gray-200 mb-8 space-x-4 overflow-x-auto">
+        <button type="button" onClick={() => setActiveTab('general')} className={`py-2 px-4 font-medium text-sm whitespace-nowrap border-b-2 transition-colors ${activeTab === 'general' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>1. General y Estado</button>
+        <button type="button" onClick={() => setActiveTab('red')} className={`py-2 px-4 font-medium text-sm whitespace-nowrap border-b-2 transition-colors ${activeTab === 'red' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>2. Red y Hardware</button>
+        <button type="button" onClick={() => setActiveTab('software')} className={`py-2 px-4 font-medium text-sm whitespace-nowrap border-b-2 transition-colors ${activeTab === 'software' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>3. Software</button>
+        <button type="button" onClick={() => setActiveTab('sistemas')} className={`py-2 px-4 font-medium text-sm whitespace-nowrap border-b-2 transition-colors ${activeTab === 'sistemas' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>4. Sistemas y Asignación</button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -183,6 +214,57 @@ export default function EditarEquipoPage({ params }: { params: Promise<{ id: str
             <div><label className="block text-sm font-medium text-gray-700">Sistema Operativo / Licencia</label><input name="sistema_operativo" value={formData.sistema_operativo} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm text-gray-900 bg-white" /></div>
             <div><label className="block text-sm font-medium text-gray-700">Antivirus Instalado</label><input name="antivirus" value={formData.antivirus} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm text-gray-900 bg-white" /></div>
             <div className="md:col-span-2"><label className="block text-sm font-medium text-gray-700">Clave / Contraseña VNC (Soporte Remoto)</label><input name="clave_vnc" value={formData.clave_vnc} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm text-gray-900 bg-white" /></div>
+          </div>
+        )}
+
+        {/* 👈 NUEVA PESTAÑA: Sistemas y Asignación */}
+        {activeTab === 'sistemas' && (
+          <div className="animate-fadeIn space-y-8">
+            <div className="bg-blue-50 p-6 rounded-lg border border-blue-100">
+              <h3 className="text-md font-bold text-blue-800 mb-4">👤 Asignación de Personal</h3>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Usuario Responsable del Equipo</label>
+                <select name="id_usuario" value={formData.id_usuario} onChange={handleChange} className="block w-full border border-gray-300 rounded-md p-2.5 shadow-sm text-gray-900 bg-white">
+                  <option value="">-- Equipo sin usuario asignado (Libre/Almacén) --</option>
+                  {usuarios.map((user) => (
+                    <option key={user.id_usuario} value={user.id_usuario}>
+                      {user.apellidos}, {user.nombres} {user.anexo ? `(Anexo: ${user.anexo})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-2">Nota: Si el trabajador no aparece, debes registrarlo primero en el módulo de "Personal".</p>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-md font-bold text-gray-800 mb-4 border-b pb-2">🔌 Accesos y Sistemas Hospitalarios</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input type="checkbox" name="tiene_sap" checked={formData.tiene_sap} onChange={handleCheckboxChange} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
+                  <span className="ml-3 font-medium text-gray-700">Sistema SAP</span>
+                </label>
+                <label className="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input type="checkbox" name="tiene_ses" checked={formData.tiene_ses} onChange={handleCheckboxChange} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
+                  <span className="ml-3 font-medium text-gray-700">Sistema SES</span>
+                </label>
+                <label className="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input type="checkbox" name="tiene_winepi" checked={formData.tiene_winepi} onChange={handleCheckboxChange} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
+                  <span className="ml-3 font-medium text-gray-700">WINEPI (Epidemiología)</span>
+                </label>
+                <label className="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input type="checkbox" name="tiene_sinadef" checked={formData.tiene_sinadef} onChange={handleCheckboxChange} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
+                  <span className="ml-3 font-medium text-gray-700">Registro SINADEF</span>
+                </label>
+                <label className="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input type="checkbox" name="en_dominio" checked={formData.en_dominio} onChange={handleCheckboxChange} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
+                  <span className="ml-3 font-medium text-gray-700">Unido al Dominio Local</span>
+                </label>
+                <label className="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input type="checkbox" name="tiene_internet" checked={formData.tiene_internet} onChange={handleCheckboxChange} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
+                  <span className="ml-3 font-medium text-gray-700">Salida a Internet Abierta</span>
+                </label>
+              </div>
+            </div>
           </div>
         )}
 
