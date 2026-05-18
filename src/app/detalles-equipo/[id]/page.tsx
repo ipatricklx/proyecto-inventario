@@ -46,15 +46,28 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
     <div className="max-w-5xl mx-auto bg-gray-50 min-h-screen py-8 px-4 text-gray-900 animate-fadeIn">
       
       {/* CABECERA */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <h2 className="text-3xl font-extrabold text-gray-800">Ficha Técnica del Equipo</h2>
-          <p className="text-gray-500 mt-1">
-            Patrimonio: <span className="font-bold text-blue-600">{equipo.cod_patrimonio}</span> | 
-            Estado Actual: <span className="font-bold ml-1 px-2 py-0.5 bg-gray-200 rounded">{equipo.estado}</span>
-          </p>
+          <div className="text-gray-500 mt-2 flex flex-wrap items-center gap-2 text-sm">
+            <span>Patrimonio SBN:</span> 
+            <span className="font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">{equipo.cod_patrimonio || 'N/A'}</span> 
+            
+            {/* Mostrar el código verde en la cabecera solo si existe */}
+            {equipo.cod_patrimonio_verde && (
+              <>
+                <span className="text-gray-300">|</span>
+                <span>Etiqueta Verde:</span>
+                <span className="font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded">{equipo.cod_patrimonio_verde}</span>
+              </>
+            )}
+            
+            <span className="text-gray-300">|</span>
+            <span>Estado Actual:</span> 
+            <span className="font-bold px-2 py-0.5 bg-gray-200 text-gray-800 rounded">{equipo.estado}</span>
+          </div>
         </div>
-        <div className="space-x-3">
+        <div className="space-x-3 shrink-0">
           <Link href="/equipos" className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition">
             Volver
           </Link>
@@ -76,7 +89,21 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
               <div><p className="text-gray-500">Tipo de Equipo</p><p className="font-bold">{equipo.tipo_equipo}</p></div>
               <div><p className="text-gray-500">Marca / Modelo</p><p className="font-bold">{equipo.marca || 'N/A'} {equipo.modelo ? `- ${equipo.modelo}` : ''}</p></div>
               <div><p className="text-gray-500">Número de Serie</p><p className="font-mono text-gray-700">{equipo.numero_serie || 'N/A'}</p></div>
-              <div><p className="text-gray-500">Origen de Patrimonio</p><p className="font-bold">{equipo.origen_patrimonio}</p></div>
+              
+              {/* Aquí reemplazamos "Origen de Patrimonio" por "Código Verde" para mantener la simetría */}
+              <div>
+                <p className="text-gray-500">Cód. Etiqueta Verde</p>
+                <p className={`font-bold ${equipo.cod_patrimonio_verde ? 'text-green-600' : 'text-gray-400'}`}>
+                  {equipo.cod_patrimonio_verde || 'Sin etiqueta verde'}
+                </p>
+              </div>
+               <div>
+                <p className="text-gray-500">Cód. Etiqueta Azul</p>
+                <p className={`font-bold ${equipo.cod_patrimonio ? 'text-blue-700' : 'text-gray-400'}`}>
+                  {equipo.cod_patrimonio || 'Sin etiqueta azul'}
+                </p>
+              </div>
+
               <div className="col-span-2">
                 <p className="text-gray-500">Ubicación Física</p>
                 <p className="font-bold text-blue-700">
