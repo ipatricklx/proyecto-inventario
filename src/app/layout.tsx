@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import '@/app/globals.css'; // Asegúrate de mantener tu importación de estilos globales
+import '@/app/globals.css';
 
 export default function RootLayout({
   children,
@@ -74,7 +74,7 @@ export default function RootLayout({
             <Link 
               href="/equipos" 
               className={`flex items-center space-x-3 p-3 rounded-lg font-medium transition-all group ${
-                pathname.startsWith('/equipos') || pathname.startsWith('/nuevo-equipo') || pathname.startsWith('/editar-equipo')
+                pathname.startsWith('/equipos') || pathname.startsWith('/nuevo-equipo') || pathname.startsWith('/editar-equipo') || pathname.startsWith('/detalles-equipo')
                   ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold' 
                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
@@ -82,6 +82,34 @@ export default function RootLayout({
             >
               <span className="text-xl">💻</span>
               <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${sidebarOpen ? 'w-auto opacity-100' : 'w-0 opacity-0'}`}>Equipos</span>
+            </Link>
+
+            {/* MÓDULO UBICACIONES */}
+            <Link 
+              href="/ubicaciones" 
+              className={`flex items-center space-x-3 p-3 rounded-lg font-medium transition-all group ${
+                pathname.startsWith('/ubicaciones')
+                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold' 
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+              title="Gestión de Ubicaciones"
+            >
+              <span className="text-xl">🏥</span>
+              <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${sidebarOpen ? 'w-auto opacity-100' : 'w-0 opacity-0'}`}>Ubicaciones</span>
+            </Link>
+
+            {/* MÓDULO PERSONAL (USUARIOS) */}
+            <Link 
+              href="/usuarios" 
+              className={`flex items-center space-x-3 p-3 rounded-lg font-medium transition-all group ${
+                pathname.startsWith('/usuarios')
+                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold' 
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+              title="Gestión de Personal"
+            >
+              <span className="text-xl">👥</span>
+              <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${sidebarOpen ? 'w-auto opacity-100' : 'w-0 opacity-0'}`}>Personal</span>
             </Link>
 
             {/* MÓDULO PERIFÉRICOS */}

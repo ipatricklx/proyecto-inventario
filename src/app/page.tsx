@@ -9,7 +9,7 @@ export default function DashboardPage() {
       </div>
 
       {/* TARJETAS DE EJEMPLO DE CAPACIDAD (Próximamente dinámicas) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-400 uppercase">Total Equipos</p>
@@ -32,6 +32,23 @@ export default function DashboardPage() {
             <p className="text-2xl font-bold text-gray-800 mt-1">--</p>
           </div>
           <span className="text-3xl bg-purple-50 p-3 rounded-lg text-purple-600">🖨️</span>
+        </div>
+
+         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-400 uppercase">Usuarios</p>
+            <p className="text-2xl font-bold text-gray-800 mt-1">--</p>
+          </div>
+          <span className="text-3xl bg-purple-50 p-3 rounded-lg text-purple-600">👥</span>
+        </div>
+
+        {/* NUEVA TARJETA DE UBICACIONES */}
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-400 uppercase">Áreas / Serv.</p>
+            <p className="text-2xl font-bold text-gray-800 mt-1">--</p>
+          </div>
+          <span className="text-3xl bg-teal-50 p-3 rounded-lg text-teal-600">🏥</span>
         </div>
 
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
