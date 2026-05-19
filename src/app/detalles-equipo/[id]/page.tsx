@@ -33,7 +33,7 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     if (typeof window !== 'undefined' && id) {
       // Genera la URL absoluta basándose en el dominio actual de la app
-      const currentUrl = `${window.location.origin}/equipos/detalles-equipo/${id}`;
+      const currentUrl = `https://proyecto-inventario-three.vercel.app/detalles-equipo/${id}`;
       setQrUrl(currentUrl);
     }
   }, [id]);
