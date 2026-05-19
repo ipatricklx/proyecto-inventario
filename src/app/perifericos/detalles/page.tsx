@@ -1,8 +1,21 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { QRCodeSVG } from 'qrcode.react';
+import { 
+  ArrowLeft, 
+  Edit, 
+  FileText, 
+  Settings2, 
+  Network, 
+  Monitor, 
+  PackageOpen, 
+  QrCode, 
+  Printer,
+  ClipboardList
+} from 'lucide-react';
 
 export default function DetallePerifericoPage() {
   const router = useRouter();
@@ -11,10 +24,17 @@ export default function DetallePerifericoPage() {
   
   const [periferico, setPeriferico] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Estados para el QR
+  const [qrUrl, setQrUrl] = useState('');
+  const qrRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (id) {
       cargarDetalles();
+      // 👈 Forzamos tu dominio de Vercel y la ruta exacta con el parámetro ?id=
+      const currentUrl = `https://proyecto-inventario-three.vercel.app/perifericos/detalles?id=${id}`;
+      setQrUrl(currentUrl);
     } else {
       setLoading(false);
     }
@@ -40,77 +60,126 @@ export default function DetallePerifericoPage() {
     setLoading(false);
   }
 
-  if (loading) return <div className="text-center py-20 text-gray-500 font-medium">Cargando ficha técnica...</div>;
+  // Función nativa optimizada para impresión de stickers de inventario (Periféricos)
+  const handlePrintQR = () => {
+    const printContent = qrRef.current?.innerHTML;
+    if (printContent) {
+      const win = window.open('', '', 'height=400,width=400');
+      win?.document.write(`
+        <html>
+          <head>
+            <title>Sticker Inventario - Periférico</title>
+            <style>
+              body { 
+                display: flex; 
+                flex-direction: column;
+                align-items: center; 
+                justify-content: center; 
+                height: 100vh; 
+                margin: 0; 
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                text-align: center;
+              }
+              .qr-box { padding: 5px; background: white; }
+              .label-id { font-size: 14px; font-weight: 800; margin-top: 10px; color: #1e293b; letter-spacing: 0.5px; }
+              .label-pat { font-size: 11px; font-weight: 600; margin-top: 2px; color: #475569; font-family: monospace; }
+              .brand { font-size: 9px; color: #94a3b8; margin-top: 8px; font-weight: 700; letter-spacing: 1px; }
+            </style>
+          </head>
+          <body>
+            <div class="qr-box">${printContent}</div>
+            <div class="label-id">CÓD. INTERNO: #PER-${id}</div>
+            <div class="label-pat">SBN: ${periferico?.cod_patrimonio_azul || periferico?.cod_patrimonio || 'S/N'}</div>
+            <div class="brand">MEDTRACK INVENTARIO</div>
+            <script>
+              window.onload = function() { window.print(); window.close(); }
+            </script>
+          </body>
+        </html>
+      `);
+      win?.document.close();
+    }
+  };
+
+  const getBadgeEstado = (estado: string) => {
+    const stateUpper = (estado || '').toUpperCase();
+    if (stateUpper === 'MALOGRADO' || stateUpper === 'BAJA') return 'bg-red-100 text-red-800 border-red-200';
+    if (stateUpper === 'OBSOLETO' || stateUpper === 'REPARACIÓN') return 'bg-orange-100 text-orange-800 border-orange-200';
+    return 'bg-green-100 text-green-800 border-green-200'; // Default: Operativo
+  };
+
+  if (loading) return <div className="text-center py-20 text-gray-500 font-medium animate-pulse">Cargando ficha técnica...</div>;
   if (!periferico) return <div className="text-center py-20 text-red-500 font-bold">Error: Periférico no encontrado o falta el ID.</div>;
 
   return (
     <div className="max-w-5xl mx-auto bg-gray-50 min-h-screen py-8 px-4 text-gray-900 animate-fadeIn">
       
-      {/* CABECERA (Adaptada al estilo de equipos) */}
+      {/* CABECERA */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h2 className="text-3xl font-extrabold text-gray-800">Ficha Técnica del Periférico</h2>
+          <h2 className="text-3xl font-extrabold text-gray-800 tracking-tight">Ficha Técnica del Periférico</h2>
           <div className="text-gray-500 mt-2 flex flex-wrap items-center gap-2 text-sm">
-            <span>Tipo:</span> 
-            <span className="font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded uppercase">{periferico.tipo_periferico}</span> 
+            <span className="font-medium">Tipo:</span> 
+            <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 uppercase">{periferico.tipo_periferico}</span> 
             
             {periferico.cod_patrimonio_verde && (
               <>
                 <span className="text-gray-300">|</span>
-                <span>Etiqueta Verde:</span>
-                <span className="font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded">{periferico.cod_patrimonio_verde}</span>
+                <span className="font-medium">Etiqueta Verde:</span>
+                <span className="font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100">{periferico.cod_patrimonio_verde}</span>
               </>
             )}
 
-            {periferico.cod_patrimonio_azul && (
+            {(periferico.cod_patrimonio_azul || periferico.cod_patrimonio) && (
               <>
                 <span className="text-gray-300">|</span>
-                <span>Etiqueta Azul:</span>
-                <span className="font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">{periferico.cod_patrimonio_azul}</span>
+                <span className="font-medium">Etiqueta Azul:</span>
+                <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{periferico.cod_patrimonio_azul || periferico.cod_patrimonio}</span>
               </>
             )}
             
             <span className="text-gray-300">|</span>
-            <span>Estado:</span> 
-            <span className="font-bold px-2 py-0.5 bg-gray-200 text-gray-800 rounded">{periferico.estado || periferico.estado_fisico || 'OPERATIVO'}</span>
+            <span className="font-medium">Estado:</span> 
+            <span className={`font-bold px-2 py-0.5 rounded border text-xs ${getBadgeEstado(periferico.estado || periferico.estado_fisico)}`}>
+              {periferico.estado || periferico.estado_fisico || 'OPERATIVO'}
+            </span>
           </div>
         </div>
-        <div className="space-x-3 shrink-0 flex">
-          <Link href="/perifericos" className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition">
-            Volver
+        <div className="flex gap-2 shrink-0 w-full sm:w-auto">
+          <Link href="/perifericos" className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition shadow-xs">
+            <ArrowLeft className="w-4 h-4" /> Volver
           </Link>
-          <Link href={`/perifericos/editar/${periferico.id_periferico}`} className="px-4 py-2 bg-amber-500 text-white rounded-lg font-bold hover:bg-amber-600 transition shadow-sm">
-            Editar Periférico
+          <Link href={`/perifericos/editar/${periferico.id_periferico}`} className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition shadow-sm">
+            <Edit className="w-4 h-4" /> Editar
           </Link>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* COLUMNA IZQUIERDA: DATOS Y ASIGNACIÓN (lg:col-span-2) */}
+        {/* COLUMNA IZQUIERDA: DATOS Y ASIGNACIÓN */}
         <div className="lg:col-span-2 space-y-6">
           
           {/* TARJETA: DATOS GENERALES */}
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2 flex items-center gap-2">📄 Información General</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div><p className="text-gray-500">Tipo de Componente</p><p className="font-bold">{periferico.tipo_periferico}</p></div>
-              <div><p className="text-gray-500">Marca / Modelo</p><p className="font-bold">{periferico.marca || 'N/A'} {periferico.modelo ? `- ${periferico.modelo}` : ''}</p></div>
-              <div><p className="text-gray-500">Número de Serie</p><p className="font-mono text-gray-700">{periferico.n_serie || periferico.numero_serie || 'N/A'}</p></div>
-              <div>
-                <p className="text-gray-500">Estado Técnico</p>
-                <p className="font-bold text-gray-800">{periferico.estado || periferico.estado_fisico || 'OPERATIVO'}</p>
-              </div>
+          <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs">
+            <h3 className="text-base font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-500" /> Información General
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div><p className="text-gray-400 text-xs font-semibold uppercase">Tipo de Componente</p><p className="font-bold text-gray-700 mt-0.5">{periferico.tipo_periferico}</p></div>
+              <div><p className="text-gray-400 text-xs font-semibold uppercase">Marca / Modelo</p><p className="font-bold text-gray-700 mt-0.5">{periferico.marca || 'N/A'} {periferico.modelo ? `- ${periferico.modelo}` : ''}</p></div>
+              <div><p className="text-gray-400 text-xs font-semibold uppercase">Número de Serie</p><p className="font-mono font-medium text-gray-600 mt-0.5">{periferico.n_serie || periferico.numero_serie || 'N/A'}</p></div>
+              <div><p className="text-gray-400 text-xs font-semibold uppercase">Estado Técnico</p><p className="font-bold text-gray-800 mt-0.5">{periferico.estado || periferico.estado_fisico || 'OPERATIVO'}</p></div>
               
               <div>
-                <p className="text-gray-500">Cód. Etiqueta Verde</p>
-                <p className={`font-bold ${periferico.cod_patrimonio_verde ? 'text-green-600' : 'text-gray-400'}`}>
+                <p className="text-gray-400 text-xs font-semibold uppercase">Cód. Etiqueta Verde</p>
+                <p className={`font-bold mt-0.5 ${periferico.cod_patrimonio_verde ? 'text-green-600' : 'text-gray-400'}`}>
                   {periferico.cod_patrimonio_verde || 'Sin etiqueta verde'}
                 </p>
               </div>
-               <div>
-                <p className="text-gray-500">Cód. Etiqueta Azul</p>
-                <p className={`font-bold ${periferico.cod_patrimonio_azul || periferico.cod_patrimonio ? 'text-blue-700' : 'text-gray-400'}`}>
+              <div>
+                <p className="text-gray-400 text-xs font-semibold uppercase">Cód. Etiqueta Azul</p>
+                <p className={`font-bold mt-0.5 ${periferico.cod_patrimonio_azul || periferico.cod_patrimonio ? 'text-blue-700' : 'text-gray-400'}`}>
                   {periferico.cod_patrimonio_azul || periferico.cod_patrimonio || 'Sin etiqueta azul'}
                 </p>
               </div>
@@ -118,36 +187,44 @@ export default function DetallePerifericoPage() {
           </div>
 
           {/* TARJETA: DETALLES TÉCNICOS */}
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2 flex items-center gap-2">⚙️ Hardware Especifico</h3>
+          <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs">
+            <h3 className="text-base font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2">
+              <Settings2 className="w-5 h-5 text-indigo-500" /> Hardware Específico
+            </h3>
             <div className="text-sm">
-              <p className="text-gray-500 mb-1">Detalle / Capacidad / Conexión</p>
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 text-gray-700">
+              <p className="text-gray-400 text-xs font-semibold uppercase mb-2">Detalle / Capacidad / Conexión</p>
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 text-gray-700 font-medium">
                 {periferico.detalle_tecnico || <span className="italic text-gray-400">No hay detalles técnicos específicos registrados para este componente.</span>}
               </div>
             </div>
           </div>
 
           {/* TARJETA: ASIGNACIÓN */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mt-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">👤 Asignación Actual</h3>
+          <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs">
+            <h3 className="text-base font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2">
+              <Network className="w-5 h-5 text-teal-500" /> Asignación Actual
+            </h3>
             <div className="grid grid-cols-1 gap-6">
               <div>
-                <p className="text-sm text-gray-500 font-bold mb-2">Computadora (Red)</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Computadora (Red)</p>
                 {periferico.equipos ? (
-                  <div className="flex items-center gap-3 bg-blue-50 p-3 rounded-lg border border-blue-100">
-                    <div className="text-3xl">💻</div>
+                  <div className="flex items-center gap-3 bg-blue-50/60 p-4 rounded-xl border border-blue-100/70">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                      <Monitor className="w-5 h-5" />
+                    </div>
                     <div>
-                      <p className="font-bold text-blue-900">{periferico.equipos.nombre_red_pc}</p>
-                      <p className="text-xs text-blue-700">Hardware vinculado operativamente.</p>
+                      <p className="font-bold text-sm text-blue-900">{periferico.equipos.nombre_red_pc}</p>
+                      <p className="text-xs text-blue-600/90 font-medium">Hardware vinculado operativamente.</p>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3 bg-amber-50 p-3 rounded-lg border border-amber-200">
-                    <div className="text-3xl">📦</div>
+                  <div className="flex items-center gap-3 bg-amber-50/60 p-4 rounded-xl border border-amber-100/70">
+                    <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
+                      <PackageOpen className="w-5 h-5" />
+                    </div>
                     <div>
-                      <p className="font-bold text-amber-900">En Almacén / Stock Libre</p>
-                      <p className="text-xs text-amber-700">No está conectado a ninguna PC en este momento.</p>
+                      <p className="font-bold text-sm text-amber-900">En Almacén / Stock Libre</p>
+                      <p className="text-xs text-amber-700/90 font-medium">No está conectado a ninguna PC en este momento.</p>
                     </div>
                   </div>
                 )}
@@ -157,33 +234,66 @@ export default function DetallePerifericoPage() {
 
         </div>
 
-        {/* COLUMNA DERECHA: LOGÍSTICA (lg:col-span-1) */}
-        <div className="lg:col-span-1">
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm h-full">
-            <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2 flex items-center gap-2">📦 Logística y Almacén</h3>
+        {/* COLUMNA DERECHA: QR Y LOGÍSTICA */}
+        <div className="lg:col-span-1 space-y-6">
+          
+          {/* GENERADOR QR MINIMALISTA */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col items-center text-center">
+            <h4 className="font-bold text-gray-800 text-sm flex items-center gap-1.5 mb-4 self-start">
+              <QrCode className="w-4 h-4 text-blue-500" /> Identificador Físico QR
+            </h4>
+            
+            <div ref={qrRef} className="bg-white p-3 rounded-xl border border-slate-100 shadow-inner mb-4">
+              {qrUrl ? (
+                <QRCodeSVG 
+                  value={qrUrl} 
+                  size={140} 
+                  level="H" 
+                  includeMargin={false}
+                />
+              ) : (
+                <div className="w-[140px] h-[140px] bg-slate-100 animate-pulse rounded-xl" />
+              )}
+            </div>
+
+            <p className="text-xs text-gray-400 px-2 mb-4 leading-relaxed">
+              Escanea para acceder directo a la ficha técnica física de este periférico en tiempo real.
+            </p>
+
+            <button
+              onClick={handlePrintQR}
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-xs"
+            >
+              <Printer className="w-3.5 h-3.5" /> Imprimir Etiqueta
+            </button>
+          </div>
+
+          {/* TARJETA LOGÍSTICA */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs">
+            <h3 className="text-base font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2">
+              <ClipboardList className="w-5 h-5 text-amber-500" /> Logística y Almacén
+            </h3>
             
             <div className="space-y-4">
               <div>
-                <p className="text-sm text-gray-500 font-bold mb-2">Observaciones de Inventario</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Observaciones de Inventario</p>
                 {periferico.observaciones_almacen ? (
-                  <p className="text-sm text-gray-700 whitespace-pre-line bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <p className="text-sm text-gray-700 whitespace-pre-line bg-slate-50 p-3.5 rounded-xl border border-slate-100 leading-relaxed">
                     {periferico.observaciones_almacen}
                   </p>
                 ) : (
-                  <p className="text-sm text-gray-500 italic bg-gray-50 p-4 rounded-lg border border-gray-100 text-center">
+                  <p className="text-xs text-gray-400 italic bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
                     Sin observaciones logísticas registradas.
                   </p>
                 )}
               </div>
 
-              {/* Espacio para futuro historial si decides agregarlo a periféricos */}
-              <div className="mt-8 pt-6 border-t border-gray-100">
-                <p className="text-xs text-gray-400 text-center italic">
-                  ID Sistema: {periferico.id_periferico}
+              <div className="mt-8 pt-4 border-t border-gray-100">
+                <p className="text-xs text-gray-400 text-center font-mono bg-gray-50 py-1.5 rounded-lg border border-gray-100">
+                  ID Sistema: PER-{periferico.id_periferico}
                 </p>
               </div>
             </div>
-
           </div>
         </div>
 
