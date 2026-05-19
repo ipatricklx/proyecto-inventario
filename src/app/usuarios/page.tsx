@@ -28,8 +28,8 @@ export default function UsuariosPage() {
     setLoading(false);
   }
 
-  const handleDesactivar = async (id: number, nombre: string) => {
-    const confirmacion = window.confirm(`¿Estás seguro de dar de baja a ${nombre}? Si tiene equipos asignados, estos mantendrán el registro histórico.`);
+  const handleDesactivar = async (id: number, textNombre: string) => {
+    const confirmacion = window.confirm(`¿Estás seguro de dar de baja a ${textNombre}? Si tiene equipos asignados, estos mantendrán el registro histórico.`);
     if (!confirmacion) return;
 
     const { error } = await supabase.from('usuarios').update({ activo: false }).eq('id_usuario', id);
@@ -38,8 +38,8 @@ export default function UsuariosPage() {
     setUsuarios(usuarios.map(u => u.id_usuario === id ? { ...u, activo: false } : u));
   };
 
-  const handleRestaurar = async (id: number, nombre: string) => {
-    const confirmacion = window.confirm(`¿Deseas reincorporar a ${nombre} al sistema?`);
+  const handleRestaurar = async (id: number, textNombre: string) => {
+    const confirmacion = window.confirm(`¿Deseas reincorporar a ${textNombre} al sistema?`);
     if (!confirmacion) return;
 
     const { error } = await supabase.from('usuarios').update({ activo: true }).eq('id_usuario', id);
@@ -56,7 +56,7 @@ export default function UsuariosPage() {
       u.cod_planilla?.toLowerCase().includes(term) ||
       u.anexo?.toLowerCase().includes(term)
     );
-    const coincideEstado = mostrarInactivos ? u.activo === false : u.activo !== false; // Asumimos true por defecto
+    const coincideEstado = mostrarInactivos ? u.activo === false : u.activo !== false;
     return coincideTexto && coincideEstado;
   });
 
@@ -131,6 +131,15 @@ export default function UsuariosPage() {
                   <td className="px-4 py-3 whitespace-nowrap text-center space-x-2">
                     {!mostrarInactivos ? (
                       <>
+                        {/* 👈 NUEVO: Enlace de inspección con Query Parameter (?id=) */}
+                        <Link 
+                          href={`/usuarios/detalles?id=${user.id_usuario}`} 
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors" 
+                          title="Ver equipos asignados"
+                        >
+                          👁️
+                        </Link>
+                        
                         <Link href={`/usuarios/editar/${user.id_usuario}`} className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-amber-50 text-amber-600 hover:bg-amber-100" title="Editar">⚙️</Link>
                         <button onClick={() => handleDesactivar(user.id_usuario, user.nombres)} className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-red-50 text-red-600 hover:bg-red-100" title="Dar de baja">🗑️</button>
                       </>

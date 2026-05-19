@@ -256,3 +256,4 @@ export default function EditarPerifericoPage({ params }: { params: Promise<{ id:
     </div>
   );
 }
+
