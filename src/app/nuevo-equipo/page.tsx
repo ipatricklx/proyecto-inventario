@@ -178,7 +178,7 @@ export default function NuevoEquipoPage() {
             
             <div className="md:col-span-2 bg-gray-50 p-4 rounded-lg border border-gray-200 mt-2">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><label className="block text-sm font-medium text-gray-700">Estado Técnico Inicial</label><select name="tipo_estado" value={formData.tipo_estado} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm bg-white"><option value="OPERATIVO">OPERATIVO</option><option value="GARANTIA">EN GARANTÍA</option><option value="OBSOLETO">OBSOLETO</option><option value="BAJA">DE BAJA</option></select></div>
+                <div><label className="block text-sm font-medium text-gray-700">Estado Técnico Inicial</label><select name="tipo_estado" value={formData.tipo_estado} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm bg-white"><option value="OPERATIVO">OPERATIVO</option><option value="GARANTIA">EN GARANTÍA</option><option value="OBSOLETO">OBSOLETO</option></select></div>
                 <div><label className="block text-sm font-medium text-gray-700">Nota u Observación (Motivo de Estado)</label><textarea name="motivo" rows={1} value={formData.motivo} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm bg-white" /></div>
               </div>
             </div>
