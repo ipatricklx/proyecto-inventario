@@ -5,11 +5,20 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import '@/app/globals.css';
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// 1. Importamos los iconos profesionales de Lucide
+import { 
+  Home, 
+  Monitor, 
+  Building2, 
+  Users, 
+  Printer, 
+  PieChart, 
+  LogOut, 
+  Menu,
+  Activity
+} from 'lucide-react';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
@@ -24,124 +33,134 @@ export default function RootLayout({
   };
 
   if (pathname === '/login') {
-    return (
-      <html lang="es">
-        <body>{children}</body>
-      </html>
-    );
+    return <html lang="es"><body>{children}</body></html>;
   }
 
   if (!mounted) {
-    return (
-      <html lang="es">
-        <body><div className="min-h-screen bg-gray-50" /></body>
-      </html>
-    );
+    return <html lang="es"><body><div className="min-h-screen bg-gray-50" /></body></html>;
   }
 
-  const isActive = (path: string) => pathname === path;
+  // 2. Mapeo limpio de navegación para no repetir código
+  const navItems = [
+    { name: 'Principal', path: '/', icon: Home },
+    { name: 'Equipos', path: '/equipos', icon: Monitor, matchPaths: ['/equipos', '/nuevo-equipo', '/editar-equipo', '/detalles-equipo'] },
+    { name: 'Ubicaciones', path: '/ubicaciones', icon: Building2 },
+    { name: 'Personal', path: '/usuarios', icon: Users },
+    { name: 'Periféricos', path: '/perifericos', icon: Printer },
+    { name: 'Reportes', path: '#', icon: PieChart },
+  ];
+
+  const isActive = (item: any) => {
+    if (item.matchPaths) {
+      return item.matchPaths.some((p: string) => pathname.startsWith(p));
+    }
+    return pathname === item.path || (item.path !== '/' && pathname.startsWith(item.path));
+  };
 
   return (
     <html lang="es">
       <body className="flex h-screen bg-gray-50 overflow-hidden font-sans antialiased text-gray-900">
         
         {/* SIDEBAR */}
-        <aside className={`bg-slate-900 text-white flex flex-col transition-all duration-300 z-20 ${sidebarOpen ? 'w-64' : 'w-20'}`}>
-          <div className="h-16 flex items-center justify-center border-b border-slate-800">
-            <h1 className={`font-black text-blue-400 transition-all ${sidebarOpen ? 'text-2xl' : 'text-sm'}`}>
-              {sidebarOpen ? <>Med<span className="text-white">Track</span></> : 'MT'}
-            </h1>
+        <aside 
+          className={`bg-slate-950 text-slate-300 flex flex-col transition-all duration-300 ease-in-out z-20 shadow-2xl relative ${
+            sidebarOpen ? 'w-64' : 'w-20'
+          }`}
+        >
+          {/* Logo / Cabecera Sidebar */}
+          <div className="h-16 flex items-center justify-center border-b border-white/5 transition-colors">
+            <div className="flex items-center gap-2 text-blue-500">
+              <Activity className={`transition-all duration-300 ${sidebarOpen ? 'w-7 h-7' : 'w-6 h-6'}`} />
+              <h1 className={`font-black tracking-tight text-white transition-all duration-300 overflow-hidden whitespace-nowrap ${
+                sidebarOpen ? 'w-auto opacity-100 text-xl' : 'w-0 opacity-0'
+              }`}>
+                Inventario
+              </h1>
+            </div>
           </div>
 
-          <nav className="flex-1 py-6 space-y-2 px-3 overflow-y-auto">
-            {/* INICIO */}
-            <Link 
-              href="/" 
-              className={`flex items-center space-x-3 p-3 rounded-lg font-medium transition-all ${
-                isActive('/') ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              <span className="text-xl">🏠</span>
-              <span className={`${sidebarOpen ? 'block' : 'hidden'}`}>Principal</span>
-            </Link>
-
-            {/* EQUIPOS */}
-            <Link 
-              href="/equipos" 
-              className={`flex items-center space-x-3 p-3 rounded-lg font-medium transition-all ${
-                pathname.startsWith('/equipos') || pathname.startsWith('/nuevo-equipo') || pathname.startsWith('/editar-equipo') || pathname.startsWith('/detalles-equipo')
-                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              <span className="text-xl">💻</span>
-              <span className={`${sidebarOpen ? 'block' : 'hidden'}`}>Equipos</span>
-            </Link>
-
-            {/* UBICACIONES */}
-            <Link 
-              href="/ubicaciones" 
-              className={`flex items-center space-x-3 p-3 rounded-lg font-medium transition-all ${
-                pathname.startsWith('/ubicaciones') ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              <span className="text-xl">🏥</span>
-              <span className={`${sidebarOpen ? 'block' : 'hidden'}`}>Ubicaciones</span>
-            </Link>
-
-            {/* PERSONAL */}
-            <Link 
-              href="/usuarios" 
-              className={`flex items-center space-x-3 p-3 rounded-lg font-medium transition-all ${
-                pathname.startsWith('/usuarios') ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              <span className="text-xl">👥</span>
-              <span className={`${sidebarOpen ? 'block' : 'hidden'}`}>Personal</span>
-            </Link>
-
-            {/* PERIFÉRICOS (INTEGRADO) */}
-            <Link 
-              href="/perifericos" 
-              className={`flex items-center space-x-3 p-3 rounded-lg font-medium transition-all group ${
-                pathname.startsWith('/perifericos')
-                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold' 
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-              }`}
-              title="Gestión de Periféricos"
-            >
-              <span className="text-xl">🖨️</span>
-              <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${sidebarOpen ? 'w-auto opacity-100' : 'w-0 opacity-0'}`}>Perifericos</span>
-            </Link>
-
-            {/* REPORTES */}
-            <Link href="#" className="flex items-center space-x-3 text-slate-300 hover:bg-slate-800 p-3 rounded-lg font-medium transition-all group" title="Reportes y Estadísticas">
-              <span className="text-xl">📊</span>
-              <span className={`${sidebarOpen ? 'block' : 'hidden'}`}>Reportes</span>
-            </Link>
+          {/* Menú de Navegación */}
+          <nav className="flex-1 py-6 space-y-1.5 px-3 overflow-y-auto custom-scrollbar">
+            {navItems.map((item) => {
+              const active = isActive(item);
+              const Icon = item.icon;
+              
+              return (
+                <Link 
+                  key={item.name}
+                  href={item.path} 
+                  className={`flex items-center space-x-3 p-3 rounded-xl font-medium transition-all duration-200 group relative ${
+                    active 
+                      ? 'bg-blue-600/15 text-blue-400' 
+                      : 'hover:bg-white/5 hover:text-white'
+                  }`}
+                  title={!sidebarOpen ? item.name : ''}
+                >
+                  <Icon 
+                    strokeWidth={active ? 2.5 : 2} 
+                    className={`w-5 h-5 flex-shrink-0 transition-transform duration-300 ${!active && 'group-hover:scale-110'}`} 
+                  />
+                  <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${
+                    sidebarOpen ? 'w-auto opacity-100' : 'w-0 opacity-0'
+                  }`}>
+                    {item.name}
+                  </span>
+                  
+                  {/* Indicador lateral sutil para el item activo */}
+                  {active && sidebarOpen && (
+                    <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  )}
+                </Link>
+              );
+            })}
           </nav>
 
-          {/* LOGOUT */}
-          <div className="p-4 border-t border-slate-800">
-            <button onClick={handleLogout} className="w-full flex items-center justify-center space-x-2 text-red-400 hover:bg-red-500/10 p-2 rounded-lg transition-all">
-              <span className="text-lg">🚪</span>
-              <span className={`${sidebarOpen ? 'block' : 'hidden'}`}>Cerrar Sesión</span>
+          {/* Botón Cerrar Sesión */}
+          <div className="p-4 border-t border-white/5">
+            <button 
+              onClick={handleLogout} 
+              className="w-full flex items-center justify-center space-x-3 text-slate-400 hover:text-red-400 hover:bg-red-500/10 p-3 rounded-xl transition-all duration-200 group"
+              title={!sidebarOpen ? 'Cerrar Sesión' : ''}
+            >
+              <LogOut className="w-5 h-5 flex-shrink-0 group-hover:-translate-x-1 transition-transform duration-300" />
+              <span className={`transition-all duration-300 overflow-hidden whitespace-nowrap font-medium ${
+                sidebarOpen ? 'w-auto opacity-100' : 'w-0 opacity-0'
+              }`}>
+                Cerrar Sesión
+              </span>
             </button>
           </div>
         </aside>
 
-        {/* MAIN CONTENT */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <header className="bg-white shadow-sm border-b h-16 flex items-center justify-between px-6 flex-shrink-0">
-            <div className="flex items-center">
-              <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 mr-4 rounded-md text-gray-500 hover:bg-gray-100 transition-colors">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+        {/* CONTENIDO PRINCIPAL */}
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#F8FAFC]">
+          
+          {/* Topbar Minimalista */}
+          <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 h-16 flex items-center justify-between px-6 flex-shrink-0 z-10 sticky top-0">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setSidebarOpen(!sidebarOpen)} 
+                className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              >
+                <Menu className="w-5 h-5" />
               </button>
-              <h1 className="text-lg font-bold text-gray-700">Sistema de Gestión Informática</h1>
+              <div className="h-5 w-px bg-slate-200 hidden sm:block"></div>
+              <h1 className="text-sm font-semibold text-slate-600 hidden sm:block tracking-wide uppercase">
+                Sistema de Gestión Informática
+              </h1>
+            </div>
+            
+            {/* Espacio para un futuro perfil de usuario o notificaciones */}
+            <div className="flex items-center">
+               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs border border-blue-200">
+                 A
+               </div>
             </div>
           </header>
 
-          <div className="flex-1 overflow-auto p-8">
-            <div className="max-w-7xl mx-auto">
+          {/* Área de la página con animación de entrada */}
+          <div className="flex-1 overflow-auto p-4 sm:p-8 custom-scrollbar">
+            <div className="max-w-7xl mx-auto animate-fadeIn">
               {children}
             </div>
           </div>
