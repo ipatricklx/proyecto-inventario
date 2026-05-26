@@ -3,10 +3,20 @@ import { useState, useEffect, use } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+// Importamos los iconos profesionales de Lucide
+import { 
+  ArrowLeft, 
+  Save, 
+  User, 
+  Mail, 
+  Phone, 
+  Terminal,
+  Contact
+} from 'lucide-react';
 
 export default function EditarUsuarioPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
-  const { id } = use(params); // Desempaquetamos el ID de la URL
+  const { id } = use(params); 
   
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -69,7 +79,6 @@ export default function EditarUsuarioPage({ params }: { params: Promise<{ id: st
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Forzamos mayúsculas solo en apellidos y nombres para mantener el orden del Excel
     const val = (e.target.name === 'apellidos' || e.target.name === 'nombres') 
                 ? e.target.value.toUpperCase() 
                 : e.target.value;
@@ -78,82 +87,138 @@ export default function EditarUsuarioPage({ params }: { params: Promise<{ id: st
   };
 
   if (initialLoading) {
-    return <div className="text-center py-20 text-gray-500 font-medium">Cargando datos del personal...</div>;
+    return <div className="text-center py-20 text-slate-500 font-medium animate-pulse">Cargando datos del personal...</div>;
   }
 
+  // Estilos globales reutilizables para los campos de texto
+  const inputStyles = "block w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-800 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 focus:bg-white transition-all duration-200";
+
   return (
-    <div className="max-w-3xl mx-auto bg-gray-50 min-h-screen py-8 px-4 text-gray-900 animate-fadeIn">
-      <div className="mb-6 flex justify-between items-center">
+    <div className="max-w-4xl mx-auto bg-[#F8FAFC] min-h-screen py-8 px-4 text-gray-900 animate-fadeIn">
+      
+      {/* CABECERA */}
+      <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Editar Datos de Personal</h2>
-          <p className="text-gray-500 text-sm mt-1">Modifica la información del trabajador en el directorio.</p>
+          <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Editar Datos de Personal</h2>
+          <p className="text-slate-500 text-sm mt-1">Actualiza los registros de identificación, medios de contacto y credenciales de red del trabajador.</p>
         </div>
-        <Link href="/usuarios" className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors">
-          Volver
+        <Link 
+          href="/usuarios" 
+          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 hover:text-slate-900 transition-all shadow-xs"
+        >
+          <ArrowLeft className="w-4 h-4" /> Volver al directorio
         </Link>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6">
+      {/* FORMULARIO */}
+      <form onSubmit={handleSubmit} className="space-y-6">
         
-        {/* IDENTIFICACIÓN */}
-        <div>
-          <h3 className="text-sm font-bold text-amber-600 mb-4 border-b pb-2">1. Identificación</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* TARJETA 1: IDENTIFICACIÓN PRINCIPAL */}
+        <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/60 shadow-xs">
+          <h3 className="text-base font-bold text-slate-800 mb-5 border-b border-slate-100 pb-3 flex items-center gap-2.5">
+            <User className="w-5 h-5 text-amber-500" /> 1. Identificación del Trabajador
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-gray-700 mb-1">Cód. Planilla / DNI</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Código Planilla / DNI</label>
               <input 
-                name="cod_planilla" value={formData.cod_planilla} onChange={handleChange} placeholder="Ej: 14626282" 
-                className="block w-full md:w-1/2 border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-amber-500 focus:border-amber-500" 
+                name="cod_planilla" 
+                value={formData.cod_planilla} 
+                onChange={handleChange} 
+                placeholder="Ej. 14626282" 
+                className={`${inputStyles} md:w-1/2 font-mono font-medium tracking-wide`} 
               />
             </div>
+            
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Apellidos (Obligatorio)</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Apellidos <span className="text-red-500">*</span></label>
               <input 
-                required name="apellidos" value={formData.apellidos} onChange={handleChange} 
-                className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-amber-500 focus:border-amber-500" 
+                required 
+                name="apellidos" 
+                value={formData.apellidos} 
+                onChange={handleChange} 
+                placeholder="Ej. PÉREZ GÓMEZ"
+                className={`${inputStyles} font-semibold`} 
               />
             </div>
+            
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Nombres (Obligatorio)</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nombres <span className="text-red-500">*</span></label>
               <input 
-                required name="nombres" value={formData.nombres} onChange={handleChange} 
-                className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-amber-500 focus:border-amber-500" 
+                required 
+                name="nombres" 
+                value={formData.nombres} 
+                onChange={handleChange} 
+                placeholder="Ej. JUAN CARLOS"
+                className={`${inputStyles} font-semibold`} 
               />
             </div>
           </div>
         </div>
 
-        {/* CONTACTO Y SISTEMA */}
-        <div className="pt-2">
-          <h3 className="text-sm font-bold text-amber-600 mb-4 border-b pb-2">2. Contacto y Red</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* TARJETA 2: CONTACTO Y DIRECTORIO ACTIVO */}
+        <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/60 shadow-xs">
+          <h3 className="text-base font-bold text-slate-800 mb-5 border-b border-slate-100 pb-3 flex items-center gap-2.5">
+            <Contact className="w-5 h-5 text-blue-500" /> 2. Canales de Contacto e Infraestructura
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Email Institucional</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-slate-400" /> Email Institucional
+              </label>
               <input 
-                type="email" name="email_institucional" value={formData.email_institucional} onChange={handleChange} 
-                className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-amber-500 focus:border-amber-500" 
+                type="email" 
+                name="email_institucional" 
+                value={formData.email_institucional} 
+                onChange={handleChange} 
+                placeholder="juan.perez@institucion.gob.pe"
+                className={inputStyles} 
               />
             </div>
+            
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Anexo Telefónico</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-slate-400" /> Anexo Telefónico
+              </label>
               <input 
-                name="anexo" value={formData.anexo} onChange={handleChange} 
-                className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-amber-500 focus:border-amber-500" 
+                name="anexo" 
+                value={formData.anexo} 
+                onChange={handleChange} 
+                placeholder="Ej. 4051 / 2210"
+                className={`${inputStyles} font-medium`} 
               />
             </div>
-            <div className="md:col-span-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <label className="block text-xs font-bold text-gray-700 mb-1">Usuario de Red / Windows</label>
+            
+            {/* CAJA ENFOCADA EN CREDENCIAL DE WINDOWS */}
+            <div className="md:col-span-2 bg-slate-50 p-5 rounded-2xl border border-slate-200/80 mt-2">
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Terminal className="w-4 h-4 text-teal-600" /> Nombre de Usuario de Red / Windows
+              </label>
               <input 
-                name="usuario_red_windows" value={formData.usuario_red_windows} onChange={handleChange} 
-                className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-amber-500 focus:border-amber-500 font-mono" 
+                name="usuario_red_windows" 
+                value={formData.usuario_red_windows} 
+                onChange={handleChange} 
+                placeholder="Ej. jperezg / dominio\jperez"
+                className={`${inputStyles} font-mono text-teal-800 bg-white shadow-xs`} 
               />
+              <p className="text-xs text-slate-400 mt-2">
+                Este identificador vincula las asignaciones de PCs locales en la infraestructura del dominio institucional.
+              </p>
             </div>
           </div>
         </div>
 
-        <div className="pt-6 border-t border-gray-200 text-right">
-          <button type="submit" disabled={loading} className="bg-amber-500 text-white px-8 py-2.5 rounded-lg hover:bg-amber-600 disabled:bg-amber-300 font-bold shadow-md transition-all">
-            {loading ? 'Actualizando...' : 'Guardar Cambios'}
+        {/* ACCIONES DE FORMULARIO */}
+        <div className="pt-4 text-right">
+          <button 
+            type="submit" 
+            disabled={loading} 
+            className="inline-flex items-center gap-2 bg-amber-500 text-white px-8 py-3 rounded-xl hover:bg-amber-600 disabled:bg-amber-300 font-bold shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer text-sm"
+          >
+            <Save className="w-4 h-4" />
+            {loading ? 'Guardando Cambios...' : 'Guardar Cambios'}
           </button>
         </div>
       </form>

@@ -29,7 +29,7 @@ export default function UbicacionesPage() {
     setLoading(false);
   }
 
-  // 👈 NUEVA FUNCIÓN: Baja lógica en lugar de borrado físico
+  // Baja lógica en lugar de borrado físico
   const handleDesactivar = async (id: number, nombre: string) => {
     const confirmacion = window.confirm(`¿Estás seguro de desactivar el área de ${nombre}? Ya no se podrán asignar nuevos equipos aquí.`);
     if (!confirmacion) return;
@@ -48,7 +48,7 @@ export default function UbicacionesPage() {
     setUbicaciones(ubicaciones.map(u => u.id_ubicacion === id ? { ...u, estado: 'INACTIVO' } : u));
   };
 
-  // 👈 NUEVA FUNCIÓN: Restaurar área
+  //  Restaurar área
   const handleRestaurar = async (id: number, nombre: string) => {
     const confirmacion = window.confirm(`¿Deseas restaurar el área de ${nombre}? Volverá a estar disponible.`);
     if (!confirmacion) return;
@@ -74,7 +74,7 @@ export default function UbicacionesPage() {
       u.servicio?.toLowerCase().includes(term) ||
       u.area?.toLowerCase().includes(term)
     );
-    // Verificamos si es activo o inactivo según el toggle
+    // activo o inactivo según el toggle
     const estadoActual = u.estado || 'ACTIVO';
     const coincideEstado = mostrarInactivos ? estadoActual === 'INACTIVO' : estadoActual === 'ACTIVO';
 
@@ -105,7 +105,7 @@ export default function UbicacionesPage() {
           />
         </div>
         
-        {/* 👈 TOGGLE DE PAPELERA */}
+        {/*PAPELERA */}
         <div className="w-full sm:w-auto flex items-center bg-gray-50 p-2 rounded-lg border border-gray-200">
           <label className="flex items-center cursor-pointer">
             <div className="relative">

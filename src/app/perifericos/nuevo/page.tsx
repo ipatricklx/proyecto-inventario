@@ -18,9 +18,9 @@ export default function NuevoPerifericoPage() {
     n_serie: '',
     detalle_tecnico: '',
     estado_fisico: 'OPERATIVO',
-    motivo: 'Registro inicial del periférico en el sistema.', // Campo añadido
+    motivo: 'Registro inicial del periférico en el sistema.',
     observaciones_almacen: '',
-    id_equipo: '', // Vacío significa almacenado
+    id_equipo: '',
     activo: true
   });
 
@@ -41,7 +41,7 @@ export default function NuevoPerifericoPage() {
     e.preventDefault();
     setLoading(true);
 
-    // Ajustamos el id_equipo si no seleccionó ninguno para que guarde un NULL correcto
+    // 
     const datosGuardar = {
       tipo_periferico: formData.tipo_periferico,
       cod_patrimonio_azul: formData.cod_patrimonio_azul,
@@ -74,7 +74,7 @@ export default function NuevoPerifericoPage() {
       await supabase.from('estados_perifericos').insert([{
         id_periferico: nuevoPeriferico.id_periferico,
         tipo_estado: formData.estado_fisico,
-        motivo: formData.motivo // Se guarda el motivo ingresado por el usuario
+        motivo: formData.motivo 
       }]);
     }
 
@@ -83,7 +83,7 @@ export default function NuevoPerifericoPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    // Forzamos mayúsculas automáticas en marcas, modelos y números de serie para evitar desorden
+    
     const forzarMayuscula = ['marca', 'modelo', 'n_serie', 'cod_patrimonio_azul', 'cod_patrimonio_verde', 'tipo_periferico'].includes(name);
     setFormData({ 
       ...formData, 
@@ -112,13 +112,11 @@ export default function NuevoPerifericoPage() {
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">Tipo de Periférico</label>
               <select name="tipo_periferico" value={formData.tipo_periferico} onChange={handleChange} className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-blue-500 focus:border-blue-500 font-bold">
-                <option value="MONITOR">MONITOR 🖥️</option>
-                <option value="IMPRESORA">IMPRESORA 🖨️</option>
-                <option value="UPS">UPS / ESTABILIZADOR 🔋</option>
-                <option value="TECLADO">TECLADO ⌨️</option>
-                <option value="MOUSE">MOUSE 🖱️</option>
-                <option value="LECTOR CODIGO">LECTOR DE CÓDIGO DE BARRAS 🏷️</option>
-                <option value="ESCÁNER">ESCÁNER 📄</option>
+                <option value="MONITOR">MONITOR</option>
+                <option value="IMPRESORA">IMPRESORA</option>
+                <option value="UPS">UPS / ESTABILIZADOR</option>
+                <option value="TECLADO">TECLADO</option>
+                <option value="MOUSE">MOUSE</option>
               </select>
             </div>
             <div>

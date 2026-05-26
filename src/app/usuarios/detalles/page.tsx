@@ -46,7 +46,7 @@ export default function DetalleUsuarioPage() {
 
     if (userError) {
       alert('Error al cargar el usuario: ' + userError.message);
-      router.push('/personal');
+      router.push('/usuarios');
       return;
     }
     if (userData) setUsuario(userData);
@@ -87,7 +87,7 @@ export default function DetalleUsuarioPage() {
           <h2 className="text-3xl font-extrabold text-gray-800 tracking-tight">Perfil del Personal</h2>
           <p className="text-gray-500 text-sm mt-1">Detalles de contacto y responsabilidades de hardware.</p>
         </div>
-        <Link href="/personal" className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition shadow-xs w-full sm:w-auto justify-center">
+        <Link href="/usuarios" className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition shadow-xs w-full sm:w-auto justify-center">
           <ArrowLeft className="w-4 h-4" /> Volver al Directorio
         </Link>
       </div>
@@ -183,7 +183,6 @@ export default function DetalleUsuarioPage() {
                       {asig.equipos?.tipo_equipo} {asig.equipos?.marca ? `· ${asig.equipos.marca}` : ''}
                     </td>
                     <td className="p-3.5 text-gray-600 font-medium">
-                      {/* 👈 Solucionado aquí: usamos el nombre exacto de la base de datos */}
                       {formatearFecha(asig.fecha_asignacion)}
                     </td>
                     <td className="p-3.5 pr-5 text-center">

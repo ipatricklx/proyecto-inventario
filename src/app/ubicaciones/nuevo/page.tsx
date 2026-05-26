@@ -34,7 +34,7 @@ export default function NuevaUbicacionPage() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value.toUpperCase() }); // Lo guardamos en mayúsculas como en el Excel
+    setFormData({ ...formData, [e.target.name]: e.target.value.toUpperCase() }); 
   };
 
   return (

@@ -14,7 +14,7 @@ export default function PapeleraPage() {
 
   async function getEquiposBaja() {
     setLoading(true);
-    // Traemos SOLO los equipos inactivos (borrados lógicamente)
+    // Traemos SOLO los equipos inactivos 
     const { data, error } = await supabase
       .from('equipos')
       .select(`
@@ -22,7 +22,7 @@ export default function PapeleraPage() {
         ubicaciones (servicio, area)
       `)
       .eq('activo', false)
-      .order('updated_at', { ascending: false }); // Ordenados por el más reciente dado de baja
+      .order('updated_at', { ascending: false });
       
     if (error) {
       console.error('Error al cargar la papelera:', error);
@@ -32,17 +32,17 @@ export default function PapeleraPage() {
     setLoading(false);
   }
 
-  // 🔄 FUNCIÓN PARA RESTAURAR EL EQUIPO
+  //  RESTAURAR EL EQUIPO
   const handleRestore = async (id_equipo: number, cod_patrimonio: string) => {
     const confirmacion = window.confirm(`¿Deseas restaurar y reactivar el equipo patrimonial ${cod_patrimonio}? Volverá al panel principal.`);
     if (!confirmacion) return;
 
-    // Hacemos el contraborrado lógico: activo pasa a true y lo devolvemos a OPERATIVO
+    
     const { error } = await supabase
       .from('equipos')
       .update({ 
         activo: true, 
-        estado: 'OPERATIVO' // Al restaurar, vuelve a estar operativo por defecto
+        estado: 'OPERATIVO'
       })
       .eq('id_equipo', id_equipo);
 
@@ -53,7 +53,7 @@ export default function PapeleraPage() {
 
     alert(`¡Equipo ${cod_patrimonio} restaurado con éxito!`);
     
-    // Filtramos el estado local para quitarlo de la papelera inmediatamente
+    
     setEquiposBaja(equiposBaja.filter(eq => eq.id_equipo !== id_equipo));
   };
 

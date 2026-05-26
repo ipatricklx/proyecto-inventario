@@ -3,6 +3,17 @@ import { useState, useEffect, use } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+// Importamos los iconos profesionales de Lucide
+import { 
+  ArrowLeft, 
+  Save, 
+  Tag, 
+  Cpu, 
+  Network, 
+  AlertTriangle,
+  FileText,
+  Boxes
+} from 'lucide-react';
 
 export default function EditarPerifericoPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -11,8 +22,6 @@ export default function EditarPerifericoPage({ params }: { params: Promise<{ id:
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [equipos, setEquipos] = useState<any[]>([]);
-  
-  // 👈 NUEVO: Estado para rastrear si el estado físico cambió
   const [estadoOriginal, setEstadoOriginal] = useState('');
   
   const [formData, setFormData] = useState({
@@ -24,7 +33,7 @@ export default function EditarPerifericoPage({ params }: { params: Promise<{ id:
     n_serie: '',
     detalle_tecnico: '',
     estado_fisico: 'OPERATIVO',
-    motivo: '', // 👈 Añadido
+    motivo: '', 
     observaciones_almacen: '',
     id_equipo: ''
   });
@@ -34,7 +43,7 @@ export default function EditarPerifericoPage({ params }: { params: Promise<{ id:
   }, [id]);
 
   async function cargarDatos() {
-    // 1. Cargar todas las PCs usando 'nombre_red_pc'
+    // Cargar listado de PCs activas
     const { data: listadoPCs } = await supabase
       .from('equipos')
       .select('id_equipo, nombre_red_pc')
@@ -42,7 +51,7 @@ export default function EditarPerifericoPage({ params }: { params: Promise<{ id:
       .order('nombre_red_pc', { ascending: true });
     if (listadoPCs) setEquipos(listadoPCs);
 
-    // 2. Cargar datos del periférico actual
+    // Cargar datos actuales del periférico
     const { data, error } = await supabase
       .from('perifericos')
       .select('*')
@@ -57,7 +66,7 @@ export default function EditarPerifericoPage({ params }: { params: Promise<{ id:
 
     if (data) {
       const estadoActual = data.estado_fisico || 'OPERATIVO';
-      setEstadoOriginal(estadoActual); // 👈 Guardamos el estado con el que inició
+      setEstadoOriginal(estadoActual); 
 
       setFormData({
         tipo_periferico: data.tipo_periferico || 'MONITOR',
@@ -68,7 +77,7 @@ export default function EditarPerifericoPage({ params }: { params: Promise<{ id:
         n_serie: data.n_serie || '',
         detalle_tecnico: data.detalle_tecnico || '',
         estado_fisico: estadoActual,
-        motivo: '', // Lo dejamos vacío para que justifiquen si lo cambian
+        motivo: '', // Vacío para forzar justificación en caso de cambio
         observaciones_almacen: data.observaciones_almacen || '',
         id_equipo: data.id_equipo ? data.id_equipo.toString() : ''
       });
@@ -80,7 +89,6 @@ export default function EditarPerifericoPage({ params }: { params: Promise<{ id:
     e.preventDefault();
     setLoading(true);
 
-    // Separamos "motivo" para no intentar guardarlo en la tabla principal de periféricos
     const { motivo, ...restoDatos } = formData;
 
     const datosGuardar = {
@@ -88,7 +96,6 @@ export default function EditarPerifericoPage({ params }: { params: Promise<{ id:
       id_equipo: formData.id_equipo === '' ? null : parseInt(formData.id_equipo)
     };
 
-    // 1. Actualizamos los datos principales del periférico
     const { error: errorUpdate } = await supabase
       .from('perifericos')
       .update(datosGuardar)
@@ -100,7 +107,7 @@ export default function EditarPerifericoPage({ params }: { params: Promise<{ id:
       return;
     }
 
-    // 2. 👈 NUEVO: Si el estado físico cambió, registramos el historial con su motivo
+    // Guardar en el historial si cambió el estado físico
     if (formData.estado_fisico !== estadoOriginal) {
       const { error: errorHistorial } = await supabase
         .from('estados_perifericos')
@@ -126,30 +133,46 @@ export default function EditarPerifericoPage({ params }: { params: Promise<{ id:
   };
 
   if (initialLoading) {
-    return <div className="text-center py-20 text-gray-500 font-medium">Cargando periférico...</div>;
+    return <div className="text-center py-20 text-gray-500 font-medium animate-pulse">Cargando datos del periférico...</div>;
   }
 
+  // Estilos base reutilizables para los inputs y selects
+  const inputStyles = "block w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-800 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 focus:bg-white transition-all duration-200";
+
   return (
-    <div className="max-w-3xl mx-auto bg-gray-50 min-h-screen py-8 px-4 text-gray-900 animate-fadeIn">
-      <div className="mb-6 flex justify-between items-center">
+    <div className="max-w-4xl mx-auto bg-[#F8FAFC] min-h-screen py-8 px-4 text-gray-900 animate-fadeIn">
+      
+      {/* CABECERA */}
+      <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Modificar Periférico</h2>
-          <p className="text-gray-500 text-sm mt-1">Modifica marcas, series, reasignaciones de PC o estados físicos.</p>
+          <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Modificar Periférico</h2>
+          <p className="text-slate-500 text-sm mt-1">Actualiza clasificaciones patrimoniales, marcas, series o asignaciones operativas.</p>
         </div>
-        <Link href="/perifericos" className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300">
-          Volver
+        <Link 
+          href="/perifericos" 
+          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 hover:text-slate-900 transition-all shadow-xs"
+        >
+          <ArrowLeft className="w-4 h-4" /> Volver al listado
         </Link>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6">
+      {/* FORMULARIO */}
+      <form onSubmit={handleSubmit} className="space-y-6">
         
-        {/* SECCIÓN 1 */}
-        <div>
-          <h3 className="text-sm font-bold text-amber-600 mb-4 border-b pb-2">1. Clasificación y Control Patrimonial</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* TARJETA 1: CLASIFICACIÓN Y CONTROL PATRIMONIAL */}
+        <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/60 shadow-xs">
+          <h3 className="text-base font-bold text-slate-800 mb-5 border-b border-slate-100 pb-3 flex items-center gap-2.5">
+            <Tag className="w-5 h-5 text-amber-500" /> 1. Clasificación y Control Patrimonial
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Tipo de Periférico</label>
-              <select name="tipo_periferico" value={formData.tipo_periferico} onChange={handleChange} className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-amber-500 focus:border-amber-500 font-bold">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tipo de Periférico</label>
+              <select 
+                name="tipo_periferico" 
+                value={formData.tipo_periferico} 
+                onChange={handleChange} 
+                className={`${inputStyles} font-bold text-amber-700`}
+              >
                 <option value="MONITOR">MONITOR 🖥️</option>
                 <option value="IMPRESORA">IMPRESORA 🖨️</option>
                 <option value="UPS">UPS / ESTABILIZADOR 🔋</option>
@@ -160,100 +183,168 @@ export default function EditarPerifericoPage({ params }: { params: Promise<{ id:
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Cód. Patrimonio Verde</label>
-              <input name="cod_patrimonio_verde" value={formData.cod_patrimonio_verde} onChange={handleChange} className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-amber-500 focus:border-amber-500 font-mono" />
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Cód. Patrimonio Verde</label>
+              <input 
+                name="cod_patrimonio_verde" 
+                value={formData.cod_patrimonio_verde} 
+                onChange={handleChange} 
+                placeholder="Ej. 23223131"
+                className={`${inputStyles} font-mono font-medium`} 
+              />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Cód. Patrimonio Azul</label>
-              <input name="cod_patrimonio_azul" value={formData.cod_patrimonio_azul} onChange={handleChange} className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-amber-500 focus:border-amber-500 font-mono" />
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Cód. Patrimonio Azul (SBN)</label>
+              <input 
+                name="cod_patrimonio_azul" 
+                value={formData.cod_patrimonio_azul} 
+                onChange={handleChange} 
+                placeholder="Ej. 232332"
+                className={`${inputStyles} font-mono font-medium`} 
+              />
             </div>
           </div>
         </div>
 
-        {/* SECCIÓN 2 */}
-        <div>
-          <h3 className="text-sm font-bold text-amber-600 mb-4 border-b pb-2">2. Especificaciones de Fábrica</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* TARJETA 2: ESPECIFICACIONES DE FÁBRICA */}
+        <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/60 shadow-xs">
+          <h3 className="text-base font-bold text-slate-800 mb-5 border-b border-slate-100 pb-3 flex items-center gap-2.5">
+            <Cpu className="w-5 h-5 text-blue-500" /> 2. Especificaciones de Fábrica
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Marca (Obligatorio)</label>
-              <input required name="marca" value={formData.marca} onChange={handleChange} className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-amber-500 focus:border-amber-500" />
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Marca <span className="text-red-500">*</span></label>
+              <input 
+                required 
+                name="marca" 
+                value={formData.marca} 
+                onChange={handleChange} 
+                placeholder="Ej. DELL, HP, EPSON"
+                className={inputStyles} 
+              />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Modelo</label>
-              <input name="modelo" value={formData.modelo} onChange={handleChange} className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-amber-500 focus:border-amber-500" />
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Modelo</label>
+              <input 
+                name="modelo" 
+                value={formData.modelo} 
+                onChange={handleChange} 
+                placeholder="Ej. L3250 / E2420H"
+                className={inputStyles} 
+              />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Número de Serie</label>
-              <input name="n_serie" value={formData.n_serie} onChange={handleChange} className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-amber-500 focus:border-amber-500 font-mono" />
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Número de Serie</label>
+              <input 
+                name="n_serie" 
+                value={formData.n_serie} 
+                onChange={handleChange} 
+                placeholder="Ej. CN-0CC732..."
+                className={`${inputStyles} font-mono`} 
+              />
             </div>
             <div className="md:col-span-3">
-              <label className="block text-xs font-bold text-gray-700 mb-1">Detalle Técnico Específico</label>
-              <input name="detalle_tecnico" value={formData.detalle_tecnico} onChange={handleChange} className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-amber-500 focus:border-amber-500" />
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Detalle Técnico Específico / Conexión</label>
+              <input 
+                name="detalle_tecnico" 
+                value={formData.detalle_tecnico} 
+                onChange={handleChange} 
+                placeholder="Ej. 24 Pulgadas FHD IPS / Conexión USB-B y Red Rj45 / 1200 VA"
+                className={inputStyles} 
+              />
             </div>
           </div>
         </div>
 
-        {/* SECCIÓN 3: ESTADO Y CONECTIVIDAD */}
-        <div>
-          <h3 className="text-sm font-bold text-amber-600 mb-4 border-b pb-2">3. Estado y Conectividad</h3>
+        {/* TARJETA 3: ESTADO OPERATIVO Y LOGÍSTICA */}
+        <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/60 shadow-xs">
+          <h3 className="text-base font-bold text-slate-800 mb-5 border-b border-slate-100 pb-3 flex items-center gap-2.5">
+            <Network className="w-5 h-5 text-teal-500" /> 3. Estado Operativo y Ubicación
+          </h3>
           
-          {/* 👈 NUEVO: CAJA GRIS CON MOTIVO INCLUIDO */}
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Alerta dinámica si cambia el estado */}
+          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Estado Operativo Oficial</label>
-                <select name="estado_fisico" value={formData.estado_fisico} onChange={handleChange} className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white focus:ring-amber-500 focus:border-amber-500 font-bold">
-                  <option value="OPERATIVO">🟢 OPERATIVO</option>
-                  <option value="GARANTIA">🔵 EN GARANTÍA</option>
-                  <option value="OBSOLETO">🟡 OBSOLETO</option>
-                  <option value="BAJA">🔴 DADO DE BAJA</option>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Estado Operativo Oficial</label>
+                <select 
+                  name="estado_fisico" 
+                  value={formData.estado_fisico} 
+                  onChange={handleChange} 
+                  className={`${inputStyles} font-bold text-slate-900`}
+                >
+                  <option value="OPERATIVO">OPERATIVO</option>
+                  <option value="GARANTIA">EN GARANTÍA</option>
+                  <option value="OBSOLETO">OBSOLETO</option>
+                  <option value="BAJA">DE BAJA</option>
                 </select>
+                
                 {formData.estado_fisico !== estadoOriginal && (
-                  <p className="text-xs text-amber-600 font-bold mt-2">
-                    ⚠️ Estás cambiando el estado (Era: {estadoOriginal}).
-                  </p>
+                  <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200/60 font-bold mt-3 p-2.5 rounded-xl">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Estás alterando el estado técnico (Anterior: <span className="underline">{estadoOriginal}</span>)</span>
+                  </div>
                 )}
               </div>
+
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Nota / Motivo del Cambio de Estado</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Justificación del Cambio de Estado</label>
                 <textarea 
                   name="motivo" 
                   value={formData.motivo} 
                   onChange={handleChange} 
                   rows={2}
-                  placeholder={formData.estado_fisico !== estadoOriginal ? "Escribe por qué cambió el estado..." : "Solo necesario si cambias el estado..."}
-                  className={`block w-full border rounded-md p-2 text-sm bg-white focus:ring-amber-500 focus:border-amber-500 ${
-                    formData.estado_fisico !== estadoOriginal && formData.motivo.trim() === '' ? 'border-amber-400 bg-amber-50' : 'border-gray-300'
+                  placeholder={formData.estado_fisico !== estadoOriginal ? "Obligatorio: Justifica la razón del cambio de estado técnico..." : "Opcional si mantiene el estado original..."}
+                  className={`${inputStyles} ${
+                    formData.estado_fisico !== estadoOriginal && formData.motivo.trim() === '' 
+                      ? 'border-amber-400 bg-amber-50/40 focus:ring-amber-500/20 focus:border-amber-500' 
+                      : ''
                   }`}
                 />
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Asignar a Computadora</label>
-              <select name="id_equipo" value={formData.id_equipo} onChange={handleChange} className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white text-gray-900 focus:ring-amber-500 focus:border-amber-500">
-                <option value="">📦 En Almacén / Suelto</option>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Vincular a Computadora (Red)</label>
+              <select 
+                name="id_equipo" 
+                value={formData.id_equipo} 
+                onChange={handleChange} 
+                className={inputStyles}
+              >
+                <option value="">📦 En Almacén / Stock Libre</option>
                 {equipos.map(eq => (
                   <option key={eq.id_equipo} value={eq.id_equipo}>💻 {eq.nombre_red_pc}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Ubicación en Almacén / Notas extra</label>
-              <textarea name="observaciones_almacen" value={formData.observaciones_almacen} onChange={handleChange} rows={2} className="block w-full border border-gray-300 rounded-md p-2 text-sm bg-white text-gray-900 focus:ring-amber-500 focus:border-amber-500" />
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Ubicación en Almacén / Observaciones</label>
+              <textarea 
+                name="observaciones_almacen" 
+                value={formData.observaciones_almacen} 
+                onChange={handleChange} 
+                rows={2} 
+                placeholder="Estante A-3, Caja de repuestos, etc..."
+                className={inputStyles} 
+              />
             </div>
           </div>
         </div>
 
-        <div className="pt-6 border-t border-gray-200 text-right">
-          <button type="submit" disabled={loading} className="bg-amber-500 text-white px-8 py-2.5 rounded-lg hover:bg-amber-600 disabled:bg-amber-300 font-bold shadow-md transition-all">
-            {loading ? 'Actualizando...' : 'Guardar Cambios'}
+        {/* BOTÓN GUARDAR */}
+        <div className="pt-4 text-right">
+          <button 
+            type="submit" 
+            disabled={loading} 
+            className="inline-flex items-center gap-2 bg-amber-500 text-white px-8 py-3 rounded-xl hover:bg-amber-600 disabled:bg-amber-300 font-bold shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer text-sm"
+          >
+            <Save className="w-4 h-4" />
+            {loading ? 'Guardando Cambios...' : 'Guardar Cambios'}
           </button>
         </div>
       </form>
     </div>
   );
 }
-

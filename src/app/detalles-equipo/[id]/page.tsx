@@ -18,8 +18,8 @@ import {
   ShieldCheck,
   AlertTriangle,
   XCircle,
-  FileSpreadsheet, // <-- Icono para Excel
-  FileDown // <-- Icono para PDF
+  FileSpreadsheet, 
+  FileDown
 } from 'lucide-react'; 
 
 export default function DetallesEquipoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -65,14 +65,13 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
     setLoading(false);
   }
 
-  // ==========================================
-  // 🔥 ACCIÓN: EXPORTAR A EXCEL
-  // ==========================================
+  // EXPORTAR A EXCEL
+
   const exportarAExcel = () => {
     if (!equipo) return;
     const libro = XLSX.utils.book_new();
 
-    // Hoja 1: Especificaciones Técnicas (Formato Vertical)
+    // Hoja 1: Especificaciones Técnicas
     const datosEquipo = [
       { 'Categoría': 'INFORMACIÓN GENERAL', 'Propiedad': 'Tipo de Equipo', 'Valor': equipo.tipo_equipo },
       { 'Categoría': 'INFORMACIÓN GENERAL', 'Propiedad': 'Marca y Modelo', 'Valor': `${equipo.marca || 'N/A'} ${equipo.modelo ? `- ${equipo.modelo}` : ''}` },
@@ -104,14 +103,13 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
     XLSX.writeFile(libro, `Ficha_Equipo_${equipo.cod_patrimonio || id}.xlsx`);
   };
 
-  // ==========================================
-  // 🔥 ACCIÓN: EXPORTAR A PDF (Ficha Completa A4)
-  // ==========================================
+
+  // EXPORTAR A PDF 
   const exportarAPDF = () => {
     window.print();
   };
 
-  // Función nativa optimizada para impresión de stickers de inventario
+  // impresión de stickers de inventario
   const handlePrintQR = () => {
     const printContent = qrRef.current?.innerHTML;
     if (printContent) {
@@ -161,7 +159,7 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
   return (
     <div className="max-w-5xl mx-auto bg-gray-50 min-h-screen py-8 px-4 text-gray-900 animate-fadeIn print:bg-white print:p-0">
       
-      {/* CABECERA EXCLUSIVA IMPRESIÓN (Visible solo en PDF) */}
+      {/* CABECERA EXCLUSIVA IMPRESIÓN (Solo pdf) */}
       <div className="hidden print:block border-b-2 border-slate-800 pb-4 mb-6">
         <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Ficha Técnica de Hardware - MedTrack</h1>
         <p className="text-xs text-gray-500 mt-1">Generado automáticamente el {new Date().toLocaleDateString()}</p>
@@ -280,7 +278,7 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
         {/* COLUMNA DERECHA: GENERACIÓN DE QR + HISTORIAL */}
         <div className="lg:col-span-1 space-y-6">
           
-          {/* TARJETA DE USUARIO ASIGNADO (Movido a la columna derecha para balancear el layout en PC) */}
+          {/* TARJETA DE USUARIO  */}
           <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs print:shadow-none print:border-gray-300">
             <h3 className="text-base font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2 print:border-gray-300">
               <User className="w-5 h-5 text-teal-500 print:hidden" /> Usuario Asignado
@@ -302,7 +300,7 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
             )}
           </div>
 
-          {/* GENERADOR QR MINIMALISTA */}
+          {/* GENERADOR QR */}
           <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col items-center text-center print:shadow-none print:border-gray-300 print:break-inside-avoid">
             <h4 className="font-bold text-gray-800 text-sm flex items-center gap-1.5 mb-4 self-start">
               <QrCode className="w-4 h-4 text-blue-500 print:hidden" /> Identificador Físico QR
@@ -320,7 +318,7 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
               Escanea con cualquier smartphone corporativo para acceder directo a la ficha técnica física en tiempo real.
             </p>
 
-            {/* Este botón solo imprime el sticker, por eso se oculta al imprimir toda la página */}
+            {/* imprimir boton */}
             <button onClick={handlePrintQR} className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-xs print:hidden">
               <Printer className="w-3.5 h-3.5" /> Imprimir Etiqueta (Sticker)
             </button>

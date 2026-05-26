@@ -151,7 +151,7 @@ export default function EquiposPage() {
               equiposFiltrados.map((equipo) => (
                 <tr key={equipo.id_equipo} className="hover:bg-gray-50 transition-colors">
                   
-                  {/* 👈 AQUÍ SE MUESTRAN AMBOS CÓDIGOS DE PATRIMONIO CON COLORES */}
+                  {/* COD PATRIMONIO CON COLOR*/}
                   <td className="px-4 py-4 whitespace-nowrap text-sm">
                     {equipo.cod_patrimonio && (
                       <div className="font-bold text-blue-700 flex items-center gap-1.5" title="Código Azul/Principal">

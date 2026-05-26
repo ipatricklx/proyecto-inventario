@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
-// 1. Importamos la librería para Excel
 import * as XLSX from 'xlsx';
 import { 
   ArrowLeft, 
@@ -89,9 +88,8 @@ export default function DetallePerifericoPage() {
     XLSX.writeFile(libro, `Ficha_Periferico_${periferico.cod_patrimonio_azul || periferico.cod_patrimonio || id}.xlsx`);
   };
 
-  // ==========================================
-  // 🔥 ACCIÓN: EXPORTAR A PDF (Ficha Completa A4)
-  // ==========================================
+  
+  //  EXPORTAR A PDF
   const exportarAPDF = () => {
     window.print();
   };
@@ -146,7 +144,7 @@ export default function DetallePerifericoPage() {
       
       {/* CABECERA EXCLUSIVA IMPRESIÓN (Visible solo en PDF) */}
       <div className="hidden print:block border-b-2 border-slate-800 pb-4 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Ficha Técnica de Periférico - MedTrack</h1>
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Ficha Técnica de Periférico</h1>
         <p className="text-xs text-gray-500 mt-1">Generado automáticamente el {new Date().toLocaleDateString()}</p>
       </div>
 
