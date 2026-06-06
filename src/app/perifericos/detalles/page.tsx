@@ -16,8 +16,8 @@ import {
   QrCode, 
   Printer,
   ClipboardList,
-  FileSpreadsheet, // <-- Icono para Excel
-  FileDown // <-- Icono para PDF
+  FileSpreadsheet,
+  FileDown
 } from 'lucide-react';
 
 export default function DetallePerifericoPage() {
@@ -35,7 +35,6 @@ export default function DetallePerifericoPage() {
   useEffect(() => {
     if (id) {
       cargarDetalles();
-      // Forzamos tu dominio de Vercel y la ruta exacta con el parámetro ?id=
       const currentUrl = `https://proyecto-inventario-three.vercel.app/perifericos/detalles?id=${id}`;
       setQrUrl(currentUrl);
     } else {
@@ -64,6 +63,23 @@ export default function DetallePerifericoPage() {
   }
 
   // ==========================================
+  // 🔥 FORMATO DE FECHA ESTILO "EQUIPOS"
+  // Evita el salto de zona horaria (resta de 1 día)
+  // ==========================================
+  const formatearFecha = (fecha: string) => {
+    if (!fecha) return 'N/A';
+    try {
+      // Supabase devuelve algo como "2024-10-15T14:30:00Z"
+      // Cortamos por la "T" y nos quedamos con "2024-10-15"
+      const soloFecha = fecha.split('T')[0]; 
+      const [year, month, day] = soloFecha.split('-');
+      return `${day}/${month}/${year}`;
+    } catch (error) {
+      return fecha; // Si falla, devuelve la fecha tal cual
+    }
+  };
+
+  // ==========================================
   // 🔥 ACCIÓN: EXPORTAR A EXCEL
   // ==========================================
   const exportarAExcel = () => {
@@ -74,6 +90,7 @@ export default function DetallePerifericoPage() {
       { 'Categoría': 'GENERAL', 'Propiedad': 'Tipo de Componente', 'Valor': periferico.tipo_periferico },
       { 'Categoría': 'GENERAL', 'Propiedad': 'Marca y Modelo', 'Valor': `${periferico.marca || 'N/A'} ${periferico.modelo ? `- ${periferico.modelo}` : ''}` },
       { 'Categoría': 'GENERAL', 'Propiedad': 'Número de Serie', 'Valor': periferico.n_serie || periferico.numero_serie || 'N/A' },
+      { 'Categoría': 'GENERAL', 'Propiedad': 'Fecha de Registro', 'Valor': formatearFecha(periferico.created_at) },
       { 'Categoría': 'INVENTARIO', 'Propiedad': 'Cód. Etiqueta Azul (SBN)', 'Valor': periferico.cod_patrimonio_azul || periferico.cod_patrimonio || 'N/A' },
       { 'Categoría': 'INVENTARIO', 'Propiedad': 'Cód. Etiqueta Verde', 'Valor': periferico.cod_patrimonio_verde || 'N/A' },
       { 'Categoría': 'ESTADO', 'Propiedad': 'Estado Técnico', 'Valor': periferico.estado || periferico.estado_fisico || 'OPERATIVO' },
@@ -88,7 +105,6 @@ export default function DetallePerifericoPage() {
     XLSX.writeFile(libro, `Ficha_Periferico_${periferico.cod_patrimonio_azul || periferico.cod_patrimonio || id}.xlsx`);
   };
 
-  
   //  EXPORTAR A PDF
   const exportarAPDF = () => {
     window.print();
@@ -225,6 +241,17 @@ export default function DetallePerifericoPage() {
                   {periferico.cod_patrimonio_azul || periferico.cod_patrimonio || 'Sin etiqueta azul'}
                 </p>
               </div>
+
+              {/* CAMPO DE FECHA ACTUALIZADO */}
+               <div>
+                <p className="text-gray-400 text-xs font-semibold uppercase print:text-gray-600">Fecha de Ingreso al Sistema</p>
+                <p className="font-bold text-indigo-700 mt-0.5">
+                  {periferico.created_at 
+                    ? new Date(periferico.created_at).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric'})
+                    : 'No registrada'}
+                </p>
+              </div>
+
             </div>
           </div>
 

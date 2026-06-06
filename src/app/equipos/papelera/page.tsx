@@ -7,7 +7,6 @@ export default function PapeleraPage() {
   const [equiposBaja, setEquiposBaja] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-
   useEffect(() => {
     getEquiposBaja();
   }, []);

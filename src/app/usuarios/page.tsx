@@ -131,7 +131,6 @@ export default function UsuariosPage() {
                   <td className="px-4 py-3 whitespace-nowrap text-center space-x-2">
                     {!mostrarInactivos ? (
                       <>
-                        {/* 👈 NUEVO: Enlace de inspección con Query Parameter (?id=) */}
                         <Link 
                           href={`/usuarios/detalles?id=${user.id_usuario}`} 
                           className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors" 

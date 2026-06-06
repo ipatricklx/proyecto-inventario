@@ -36,7 +36,6 @@ export default function DashboardPage() {
   async function fetchDashboardData() {
     setLoading(true);
     try {
-      // 1. Consultas simultáneas a Supabase para máxima velocidad
       const [
         { count: equiposCount },
         { count: perifericosCount },
@@ -51,7 +50,12 @@ export default function DashboardPage() {
         supabase.from('equipos').select('*', { count: 'exact', head: true }),
         supabase.from('perifericos').select('*', { count: 'exact', head: true }),
         supabase.from('usuarios').select('*', { count: 'exact', head: true }).eq('activo', true),
-        supabase.from('equipos').select('*', { count: 'exact', head: true }).not('id_usuario', 'is', null),
+        
+        // CORRECCIÓN 1: Las PCs en uso solo deben contar equipos que NO estén dados de baja
+        supabase.from('equipos').select('*', { count: 'exact', head: true })
+          .not('id_usuario', 'is', null)
+          .neq('estado', 'BAJA'),
+          
         supabase.from('equipos').select('*', { count: 'exact', head: true }).eq('estado', 'GARANTIA'),
         supabase.from('equipos').select('*', { count: 'exact', head: true }).eq('estado', 'OBSOLETO'),
         supabase.from('equipos').select('*', { count: 'exact', head: true }).eq('estado', 'BAJA'),
@@ -81,6 +85,14 @@ export default function DashboardPage() {
     return <div className="text-center py-20 text-gray-500 font-medium animate-pulse">Cargando panel de control...</div>;
   }
 
+  // CORRECCIÓN 2: Calcular la flota operativa real (Total absoluto - Los retirados de baja)
+  const equiposOperativosReales = metrics.totalEquipos - metrics.equiposBaja;
+  
+  // CORRECCIÓN 3: La tasa ahora divide las PCs asignadas útiles entre la flota operativa útil
+  const tasaDeUsoCalculada = equiposOperativosReales > 0 
+    ? Math.round((metrics.pcsEnUso / equiposOperativosReales) * 100) 
+    : 0;
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8 text-gray-900 animate-fadeIn">
       
@@ -109,14 +121,13 @@ export default function DashboardPage() {
 
             <div className="mt-2">
               <p className="text-xs text-blue-600 font-medium flex items-center gap-1.5 bg-blue-50/50 inline-flex px-2 py-0.5 rounded-md">
-                <Monitor className="w-3 h-3" /> {metrics.pcsEnUso} asignados
+                <Monitor className="w-3 h-3" /> {metrics.pcsEnUso} activos en uso
               </p>
             </div>
             
             <Link href="/equipos" className="text-xs text-gray-400 hover:text-indigo-600 font-medium transition-colors inline-block mt-2">
               Ver listado →
             </Link>
-        
           </div>
           <div className="w-12 h-12 bg-blue-50 group-hover:bg-blue-100 transition-colors text-blue-600 rounded-xl flex items-center justify-center border border-blue-100">
             <Monitor className="w-6 h-6" />
@@ -151,14 +162,14 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* TARJETA: % EFICIENCIA / USO */}
+        {/* TARJETA: % TASA DE USO REAL */}
         <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between hover:shadow-md transition-all duration-200 group">
           <div>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Tasa de Uso (PC)</p>
             <h3 className="text-3xl font-black text-gray-800">
-              {metrics.totalEquipos > 0 ? Math.round((metrics.pcsEnUso / metrics.totalEquipos) * 100) : 0}%
+              {tasaDeUsoCalculada}%
             </h3>
-            <p className="text-xs text-gray-400 font-medium mt-1.5">Equipos operativos</p>
+            <p className="text-xs text-gray-400 font-medium mt-1.5">De la flota operativa útil</p>
           </div>
           <div className="w-12 h-12 bg-amber-50 group-hover:bg-amber-100 transition-colors text-amber-600 rounded-xl flex items-center justify-center border border-amber-100">
             <Activity className="w-6 h-6" />
@@ -173,7 +184,6 @@ export default function DashboardPage() {
         </h2>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
           {/* BLOQUE: GARANTÍA */}
           <div className="bg-amber-50/50 rounded-2xl p-6 border border-amber-200/60 shadow-xs">
             <h4 className="font-bold text-amber-800 text-sm uppercase tracking-wider flex items-center gap-2 mb-4">
@@ -223,7 +233,6 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-
         </div>
       </div>
 

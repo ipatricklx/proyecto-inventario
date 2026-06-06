@@ -12,7 +12,7 @@ export default function NuevoEquipoPage() {
   const [formData, setFormData] = useState({
     // Datos Generales (ACTUALIZADO)
     cod_patrimonio: '',
-    cod_patrimonio_verde: '', // 👈 Nuevo campo
+    cod_patrimonio_verde: '', 
     tipo_equipo: '',
     marca: '',
     modelo: '', 
@@ -63,7 +63,7 @@ export default function NuevoEquipoPage() {
 
     const ipFinal = formData.direccion_ip.trim() === '' ? null : formData.direccion_ip;
     const macFinal = formData.direccion_mac.trim() === '' ? null : formData.direccion_mac;
-    // 👈 Manejamos el código verde vacío como null
+    
     const verdeFinal = formData.cod_patrimonio_verde.trim() === '' ? null : formData.cod_patrimonio_verde;
 
     const { data: nuevoEquipo, error: errorEquipo } = await supabase
@@ -146,7 +146,7 @@ export default function NuevoEquipoPage() {
           <h3 className="text-lg font-bold text-gray-800 mb-6 border-b pb-2">1. Datos Generales y Estado</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
-            {/* 👈 NUEVOS INPUTS DE PATRIMONIO */}
+            {/*  INPUTS DE PATRIMONIO */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Código de Patrimonio (Azul/Principal)</label>
               <input 

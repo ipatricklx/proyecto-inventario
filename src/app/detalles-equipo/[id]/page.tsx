@@ -3,7 +3,6 @@ import { useEffect, useState, use, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react'; 
-// 1. Importamos la librería de Excel
 import * as XLSX from 'xlsx';
 import { 
   ArrowLeft, 
@@ -66,13 +65,13 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
   }
 
   // EXPORTAR A EXCEL
-
   const exportarAExcel = () => {
     if (!equipo) return;
     const libro = XLSX.utils.book_new();
 
-    // Hoja 1: Especificaciones Técnicas
+    // Hoja 1: Especificaciones Técnicas (AÑADIDA LA FECHA DE REGISTRO AQUÍ)
     const datosEquipo = [
+      { 'Categoría': 'INFORMACIÓN GENERAL', 'Propiedad': 'Fecha de Registro', 'Valor': equipo.created_at ? new Date(equipo.created_at).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No registrada' },
       { 'Categoría': 'INFORMACIÓN GENERAL', 'Propiedad': 'Tipo de Equipo', 'Valor': equipo.tipo_equipo },
       { 'Categoría': 'INFORMACIÓN GENERAL', 'Propiedad': 'Marca y Modelo', 'Valor': `${equipo.marca || 'N/A'} ${equipo.modelo ? `- ${equipo.modelo}` : ''}` },
       { 'Categoría': 'INFORMACIÓN GENERAL', 'Propiedad': 'Número de Serie', 'Valor': equipo.numero_serie || 'N/A' },
@@ -102,7 +101,6 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
     // Descarga
     XLSX.writeFile(libro, `Ficha_Equipo_${equipo.cod_patrimonio || id}.xlsx`);
   };
-
 
   // EXPORTAR A PDF 
   const exportarAPDF = () => {
@@ -211,7 +209,7 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
         {/* COLUMNA IZQUIERDA: DATOS Y HARDWARE */}
         <div className="lg:col-span-2 space-y-6">
           
-          {/* TARJETA: DATOS GENERALES */}
+          {/* TARJETA: DATOS GENERALES (FECHA DE REGISTRO AÑADIDA AQUÍ) */}
           <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs print:shadow-none print:border-gray-300">
             <h3 className="text-base font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2 print:border-gray-300">
               <FileText className="w-5 h-5 text-blue-500 print:hidden" /> Información General
@@ -220,6 +218,17 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
               <div><p className="text-gray-400 text-xs font-semibold uppercase print:text-gray-600">Tipo de Equipo</p><p className="font-bold text-gray-700 mt-0.5">{equipo.tipo_equipo}</p></div>
               <div><p className="text-gray-400 text-xs font-semibold uppercase print:text-gray-600">Marca / Modelo</p><p className="font-bold text-gray-700 mt-0.5">{equipo.marca || 'N/A'} {equipo.modelo ? `- ${equipo.modelo}` : ''}</p></div>
               <div><p className="text-gray-400 text-xs font-semibold uppercase print:text-gray-600">Número de Serie</p><p className="font-mono font-medium text-gray-600 mt-0.5">{equipo.numero_serie || 'N/A'}</p></div>
+              
+              {/* NUEVO BLOQUE: FECHA DE REGISTRO */}
+              <div>
+                <p className="text-gray-400 text-xs font-semibold uppercase print:text-gray-600">Fecha de Ingreso al Sistema</p>
+                <p className="font-bold text-indigo-700 mt-0.5">
+                  {equipo.created_at 
+                    ? new Date(equipo.created_at).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric'})
+                    : 'No registrada'}
+                </p>
+              </div>
+
               <div><p className="text-gray-400 text-xs font-semibold uppercase print:text-gray-600">Cód. Etiqueta Verde</p><p className={`font-bold mt-0.5 ${equipo.cod_patrimonio_verde ? 'text-green-600' : 'text-gray-400'}`}>{equipo.cod_patrimonio_verde || 'Sin etiqueta'}</p></div>
               <div><p className="text-gray-400 text-xs font-semibold uppercase print:text-gray-600">Cód. Etiqueta Azul (SBN)</p><p className={`font-bold mt-0.5 ${equipo.cod_patrimonio ? 'text-blue-700 print:text-gray-800' : 'text-gray-400'}`}>{equipo.cod_patrimonio || 'Sin etiqueta'}</p></div>
               <div className="sm:col-span-2"><p className="text-gray-400 text-xs font-semibold uppercase print:text-gray-600">Ubicación Física</p><p className="font-bold text-blue-700 mt-0.5 print:text-gray-800">{equipo.ubicaciones ? `${equipo.ubicaciones.servicio} — ${equipo.ubicaciones.area}` : 'Almacén / Sin Asignar'}</p></div>

@@ -45,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     { name: 'Ubicaciones', path: '/ubicaciones', icon: Building2 },
     { name: 'Personal', path: '/usuarios', icon: Users },
     { name: 'Periféricos', path: '/perifericos', icon: Printer },
-    { name: 'Reportes', path: '#', icon: PieChart },
+    { name: 'Reportes', path: '/Reportes', icon: PieChart },
   ];
 
   const isActive = (item: any) => {
@@ -72,7 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <h1 className={`font-black tracking-tight text-white transition-all duration-300 overflow-hidden whitespace-nowrap ${
                 sidebarOpen ? 'w-auto opacity-100 text-xl' : 'w-0 opacity-0'
               }`}>
-                MedTrack
+                Inventario
               </h1>
             </div>
           </div>
