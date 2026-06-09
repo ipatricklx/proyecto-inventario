@@ -1,10 +1,12 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import useSWR from 'swr';
+// 🌟 Importamos los utilitarios de Excel (Agregado downloadExcelTemplate)
+import { exportToExcel, downloadExcelTemplate } from '@/utils/excelExport';
+import { importFromExcel } from '@/utils/excelImport';
 
-// 🌟 1. INTERFACES PARA TIPADO ESTRICTO
 interface Ubicacion {
   id_ubicacion: number;
   red_asistencial: string;
@@ -22,7 +24,6 @@ interface UbicacionesResponse {
 
 const ITEMS_POR_PAGINA = 10;
 
-// 🌟 2. HOOK DE DEBOUNCE (Se mantiene igual)
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
   useEffect(() => {
@@ -32,7 +33,6 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-// 🌟 3. FETCHER DE SWR (Recibe el array de dependencias como argumentos)
 const fetchUbicaciones = async ([_key, search, inactivos, page]: [string, string, boolean, number]): Promise<UbicacionesResponse> => {
   let query = supabase
     .from('ubicaciones')
@@ -67,33 +67,128 @@ const fetchUbicaciones = async ([_key, search, inactivos, page]: [string, string
 };
 
 export default function UbicacionesPage() {
-  // Estados para los filtros y paginación
   const [searchTerm, setSearchTerm] = useState('');
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
   const [paginaActual, setPaginaActual] = useState(1);
+  
+  // 🌟 Estados para exportación e importación
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const debouncedSearch = useDebounce(searchTerm, 500);
 
-  // Resetear a página 1 si cambian los filtros
   useEffect(() => {
     setPaginaActual(1);
   }, [debouncedSearch, mostrarInactivos]);
 
-  // 🌟 4. USO DE SWR CON ARRAY KEY Y KEEP_PREVIOUS_DATA
   const { data: response, error, isLoading, mutate } = useSWR<UbicacionesResponse>(
-    ['ubicaciones', debouncedSearch, mostrarInactivos, paginaActual], // Array como llave
+    ['ubicaciones', debouncedSearch, mostrarInactivos, paginaActual],
     fetchUbicaciones,
-    {
-      keepPreviousData: true, // Mantiene la data actual en pantalla mientras hace fetch de la nueva página
-      revalidateOnFocus: false, // Opcional: evita refrescar si el usuario cambia de pestaña rápido para no perder su posición
-    }
+    { keepPreviousData: true, revalidateOnFocus: false }
   );
 
   const ubicaciones = response?.data || [];
   const totalUbicaciones = response?.count || 0;
   const totalPaginas = Math.ceil(totalUbicaciones / ITEMS_POR_PAGINA);
 
-  // 🌟 5. ACCIONES (Usan mutate() en lugar de getUbicaciones())
+  // 🌟 FUNCIÓN: Exportar Excel
+  const handleExportarExcel = async () => {
+    try {
+      setExporting(true);
+      
+      let query = supabase.from('ubicaciones').select('*');
+      
+      if (debouncedSearch) {
+        query = query.or(`departamento.ilike.%${debouncedSearch}%,servicio.ilike.%${debouncedSearch}%,area.ilike.%${debouncedSearch}%`);
+      }
+      if (mostrarInactivos) {
+        query = query.eq('estado', 'INACTIVO');
+      } else {
+        query = query.or('estado.eq.ACTIVO,estado.is.null');
+      }
+
+      const { data, error: fetchError } = await query.order('departamento', { ascending: true });
+
+      if (fetchError) throw fetchError;
+
+      const columnasReporte = [
+        { header: 'Red Asistencial', key: 'red_asistencial', width: 25 },
+        { header: 'Centro Asistencial', key: 'centro_asistencial', width: 30 },
+        { header: 'Departamento', key: 'departamento', width: 25 },
+        { header: 'Servicio Hospitalario', key: 'servicio', width: 25 },
+        { header: 'Área Específica', key: 'area', width: 25 },
+        { header: 'Estado', key: 'estado', width: 15 },
+      ];
+
+      await exportToExcel(
+        'Reporte de Estructura Orgánica y Ubicaciones (EsSalud)',
+        columnasReporte,
+        data || [],
+        'Reporte_Ubicaciones'
+      );
+
+    } catch (err: any) {
+      alert('Error al exportar Excel: ' + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // 🌟 NUEVA FUNCIÓN: Descargar Plantilla
+ const handleDescargarPlantilla = async () => {
+    try {
+      const columnasPlantilla = ['red_asistencial', 'centro_asistencial', 'departamento', 'servicio', 'area'];
+      // AHORA LE PASAMOS UN EJEMPLO COMO TERCER PARÁMETRO
+      const filaDeEjemplo = ['Almenara', 'Hospital Grau', 'Emergencia', 'Traumatología', 'Tópico 1'];
+      
+      await downloadExcelTemplate(
+        columnasPlantilla, 
+        'Plantilla_Importacion_Ubicaciones', 
+        filaDeEjemplo
+      );
+    } catch (err) {
+      alert('Error al generar la plantilla');
+    }
+  };
+
+  // 🌟 FUNCIÓN: Importar Excel masivo
+  const handleImportarExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImporting(true);
+      
+      const columnasEsperadas = ['red_asistencial', 'centro_asistencial', 'departamento', 'servicio'];
+      const datosCrudos = await importFromExcel(file, columnasEsperadas);
+
+      const datosParaSupabase = datosCrudos.map((fila) => ({
+        red_asistencial: fila['red_asistencial'],
+        centro_asistencial: fila['centro_asistencial'],
+        departamento: fila['departamento'],
+        servicio: fila['servicio'],
+        area: fila['area'] || null,
+        estado: 'ACTIVO'
+      }));
+
+      const { error } = await supabase.from('ubicaciones').insert(datosParaSupabase);
+
+      if (error) throw error;
+
+      alert(`✅ ¡Se importaron ${datosParaSupabase.length} ubicaciones con éxito!`);
+      
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      
+      mutate();
+
+    } catch (err: any) {
+      alert('Error al importar Excel: ' + err.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const handleDesactivar = async (id: number, nombre: string) => {
     const confirmacion = window.confirm(`¿Estás seguro de desactivar el área de ${nombre}? Ya no se podrán asignar nuevos equipos aquí.`);
     if (!confirmacion) return;
@@ -107,8 +202,7 @@ export default function UbicacionesPage() {
       alert('Error al desactivar: ' + error.message);
       return;
     }
-    
-    mutate(); // Recargar la data de la página actual
+    mutate();
   };
 
   const handleRestaurar = async (id: number, nombre: string) => {
@@ -124,8 +218,7 @@ export default function UbicacionesPage() {
       alert('Error al restaurar: ' + error.message);
       return;
     }
-    
-    mutate(); // Recargar la data de la página actual
+    mutate();
   };
 
   if (error) {
@@ -134,16 +227,59 @@ export default function UbicacionesPage() {
 
   return (
     <div className="animate-fadeIn text-gray-900 p-4 max-w-7xl mx-auto">
+      {/* CABECERA */}
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Estructura Orgánica</h2>
           <p className="text-gray-500 text-sm">Directorio de departamentos, servicios y áreas del hospital.</p>
         </div>
-        <Link href="/ubicaciones/nuevo" className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-all shadow-md font-bold text-sm flex items-center gap-2">
-          <span>➕</span> Agregar Área
-        </Link>
+        
+        {/* GRUPO DE BOTONES */}
+        <div className="flex gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap">
+          
+          {/* Input oculto para cargar archivo */}
+          <input 
+            type="file" 
+            accept=".xlsx, .xls" 
+            ref={fileInputRef} 
+            className="hidden" 
+            onChange={handleImportarExcel}
+          />
+
+          {/* Botón Descargar Plantilla */}
+          <button
+            onClick={handleDescargarPlantilla}
+            className="bg-white text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-50 transition-all shadow-sm font-bold text-sm flex items-center gap-2"
+            title="Descargar Excel vacío con el formato correcto"
+          >
+            <span>📋</span> Plantilla
+          </button>
+          
+          {/* Botón Importar */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            className="bg-amber-500 text-white px-4 py-2.5 rounded-lg hover:bg-amber-600 transition-all shadow-md font-bold text-sm flex items-center gap-2 disabled:bg-amber-300"
+          >
+            <span>📤</span> {importing ? 'Subiendo...' : 'Importar Excel'}
+          </button>
+
+          {/* Botón Exportar */}
+          <button
+            onClick={handleExportarExcel}
+            disabled={exporting}
+            className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg hover:bg-emerald-700 transition-all shadow-md font-bold text-sm flex items-center gap-2 disabled:bg-emerald-400"
+          >
+            <span>📥</span> {exporting ? 'Generando...' : 'Exportar Excel'}
+          </button>
+          
+          <Link href="/ubicaciones/nuevo" className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-all shadow-md font-bold text-sm flex items-center gap-2 whitespace-nowrap">
+            ➕ Agregar Área
+          </Link>
+        </div>
       </div>
 
+      {/* FILTROS */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
         <div className="w-full sm:w-2/3">
           <label className="block text-xs font-bold text-gray-500 mb-1">Buscar por Departamento, Servicio o Área</label>
@@ -156,7 +292,6 @@ export default function UbicacionesPage() {
           />
         </div>
         
-        {/* PAPELERA */}
         <div className="w-full sm:w-auto flex items-center bg-gray-50 p-2 rounded-lg border border-gray-200">
           <label className="flex items-center cursor-pointer">
             <div className="relative">
@@ -171,8 +306,8 @@ export default function UbicacionesPage() {
         </div>
       </div>
 
+      {/* TABLA */}
       <div className="bg-white shadow-sm rounded-t-xl overflow-x-auto border border-gray-200 relative">
-        {/* Indicador visual suave de recarga durante el keepPreviousData */}
         {isLoading && <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500 animate-pulse z-10"></div>}
 
         <table className="min-w-full divide-y divide-gray-200">
@@ -225,7 +360,7 @@ export default function UbicacionesPage() {
         </table>
       </div>
 
-      {/* CONTROLES DE PAGINACIÓN */}
+      {/* PAGINACIÓN */}
       {totalPaginas > 1 && (
         <div className="bg-white px-4 py-3 border border-t-0 border-gray-200 rounded-b-xl flex items-center justify-between sm:px-6">
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">

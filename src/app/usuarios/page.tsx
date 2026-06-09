@@ -1,10 +1,13 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-import useSWR from 'swr'; // 👈 1. Importamos SWR
+import useSWR from 'swr';
+// 🌟 Importamos los utilitarios universales de Excel
+import { exportToExcel, downloadExcelTemplate } from '@/utils/excelExport';
+import { importFromExcel } from '@/utils/excelImport';
 
-// Pon esto debajo de tus imports
+// INTERFAZ DE USUARIO
 interface Usuario {
   id_usuario: number;
   nombres: string;
@@ -16,7 +19,7 @@ interface Usuario {
   activo: boolean;
 }
 
-// HOOK DE DEBOUNCE (Lo mantenemos igual)
+// HOOK DE DEBOUNCE
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
   useEffect(() => {
@@ -26,8 +29,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-// 🌟 2. EL FETCHER DE SUPABASE
-// Esta función es la que SWR usará para ir a la base de datos
+// 🌟 EL FETCHER DE SUPABASE
 const fetchUsuarios = async ([key, search, inactivos, paginaActual]: [string, string, boolean, number]) => {
   const ITEMS_POR_PAGINA = 10;
   
@@ -51,7 +53,6 @@ const fetchUsuarios = async ([key, search, inactivos, paginaActual]: [string, st
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
   
-  // Devolvemos tanto la data como el total para la paginación
   return { usuarios: data || [], total: count || 0 };
 };
 
@@ -65,26 +66,124 @@ export default function UsuariosPage() {
   const [paginaActual, setPaginaActual] = useState(1);
   const ITEMS_POR_PAGINA = 10;
 
+  // Estados para acciones de Excel
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Resetear a página 1 si cambian los filtros
   useEffect(() => {
     setPaginaActual(1);
   }, [debouncedSearch, mostrarInactivos]);
 
-  // 🌟 3. LA MAGIA DE SWR
-  // Si la llave (el array) cambia, SWR hace fetch automáticamente.
-  // keepPreviousData evita que la pantalla parpadee en blanco al cambiar de página.
+  // LA MAGIA DE SWR
   const { data, error, isLoading, mutate } = useSWR(
     ['usuarios', debouncedSearch, mostrarInactivos, paginaActual], 
     fetchUsuarios,
     { keepPreviousData: true } 
   );
 
-  // Extraemos los datos de SWR (con valores por defecto por si aún no carga)
   const usuarios = data?.usuarios || [];
   const totalUsuarios = data?.total || 0;
   const totalPaginas = Math.ceil(totalUsuarios / ITEMS_POR_PAGINA);
 
-  // 🌟 4. MUTATE (Para actualizar la tabla sin recargar)
+  // 🌟 ACCIONES EXCEL PARA USUARIOS
+  const handleDescargarPlantilla = async () => {
+    try {
+      const columnasPlantilla = [
+        'cod_planilla', 'nombres', 'apellidos', 'usuario_red_windows', 'anexo', 'email_institucional'
+      ];
+      
+      const filaEjemplo = [
+        '14626282', 'Domingo', 'Zavala', 'dzavala', '4321', 'dzavala@institucion.gob.pe'
+      ];
+
+      await downloadExcelTemplate(columnasPlantilla, 'Plantilla_Carga_Personal', filaEjemplo);
+    } catch (err) {
+      alert('Error al generar la plantilla');
+    }
+  };
+
+  const handleImportarExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImporting(true);
+      
+      // Validamos los campos indispensables para crear un registro válido
+      const columnasEsperadas = ['nombres', 'apellidos'];
+      const datosCrudos = await importFromExcel(file, columnasEsperadas);
+
+      const datosParaSupabase = datosCrudos.map((fila) => ({
+        cod_planilla: fila['cod_planilla'] ? String(fila['cod_planilla']) : null,
+        nombres: fila['nombres'],
+        apellidos: fila['apellidos'],
+        usuario_red_windows: fila['usuario_red_windows'] || null,
+        anexo: fila['anexo'] ? String(fila['anexo']) : null,
+        email_institucional: fila['email_institucional'] || null,
+        activo: true // Por defecto ingresan en estado activo
+      }));
+
+      const { error } = await supabase.from('usuarios').insert(datosParaSupabase);
+      if (error) throw error;
+
+      alert(`✅ ¡Se importaron ${datosParaSupabase.length} usuarios con éxito!`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      mutate();
+
+    } catch (err: any) {
+      alert('Error al importar usuarios: ' + err.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleExportarExcel = async () => {
+    try {
+      setExporting(true);
+      
+      let query = supabase.from('usuarios').select('*');
+      
+      if (debouncedSearch) {
+        query = query.or(`nombres.ilike.%${debouncedSearch}%,apellidos.ilike.%${debouncedSearch}%,cod_planilla.ilike.%${debouncedSearch}%,anexo.ilike.%${debouncedSearch}%`);
+      }
+      if (mostrarInactivos) {
+        query = query.eq('activo', false);
+      } else {
+        query = query.or('activo.eq.true,activo.is.null'); 
+      }
+
+      const { data, error: fetchError } = await query.order('apellidos', { ascending: true });
+      if (fetchError) throw fetchError;
+
+      // Mapeamos los datos agregando la anotación (eq: any) para prevenir conflictos con TypeScript strict
+      const dataMapeada = (data || []).map((eq: any) => ({
+        ...eq,
+        estado_usuario: eq.activo ? 'ACTIVO' : 'CESADO'
+      }));
+
+      const columnasReporte = [
+        { header: 'Código Planilla', key: 'cod_planilla', width: 18 },
+        { header: 'Apellidos', key: 'apellidos', width: 25 },
+        { header: 'Nombres', key: 'nombres', width: 25 },
+        { header: 'Usuario de Red', key: 'usuario_red_windows', width: 20 },
+        { header: 'Anexo / Ext', key: 'anexo', width: 15 },
+        { header: 'Correo Electrónico', key: 'email_institucional', width: 30 },
+        { header: 'Estado', key: 'estado_usuario', width: 15 }
+      ];
+
+      const nombreArchivo = mostrarInactivos ? 'Reporte_Personal_Cesado' : 'Directorio_Personal_Activo';
+      await exportToExcel('Directorio y Control de Personal', columnasReporte, dataMapeada, nombreArchivo);
+
+    } catch (err: any) {
+      alert('Error al exportar Excel: ' + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // MUTATE ACCIONES DE BAJA Y RESTAURAR
   const handleDesactivar = async (id: number, textNombre: string) => {
     const confirmacion = window.confirm(`¿Estás seguro de dar de baja a ${textNombre}?`);
     if (!confirmacion) return;
@@ -92,7 +191,7 @@ export default function UsuariosPage() {
     const { error } = await supabase.from('usuarios').update({ activo: false }).eq('id_usuario', id);
     if (error) { alert('Error: ' + error.message); return; }
     
-    mutate(); // 👈 Le dice a SWR: "Oye, los datos cambiaron, actualiza la caché ahora"
+    mutate();
   };
 
   const handleRestaurar = async (id: number, textNombre: string) => {
@@ -102,23 +201,39 @@ export default function UsuariosPage() {
     const { error } = await supabase.from('usuarios').update({ activo: true }).eq('id_usuario', id);
     if (error) { alert('Error: ' + error.message); return; }
     
-    mutate(); // 👈 Refresca la caché al instante
+    mutate();
   };
 
-  // Manejo de errores fatales
   if (error) return <div className="text-red-500 p-4 text-center">Error al cargar datos: {error.message}</div>;
 
   return (
     <div className="animate-fadeIn text-gray-900 p-4 max-w-7xl mx-auto">
-      {/* CABECERA Y BOTONES */}
+      {/* CABECERA Y BOTONES DE CONTROL DE EXCEL */}
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Directorio de Personal</h2>
           <p className="text-gray-500 text-sm">Gestión de usuarios y responsables de equipos informáticos.</p>
         </div>
-        <Link href="/usuarios/nuevo" className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-all shadow-md font-bold text-sm flex items-center gap-2">
-          <span>➕</span> Registrar Personal
-        </Link>
+        
+        <div className="flex gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap">
+          <input type="file" accept=".xlsx, .xls" ref={fileInputRef} className="hidden" onChange={handleImportarExcel} />
+
+          <button onClick={handleDescargarPlantilla} className="bg-white text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-50 transition-all shadow-sm font-bold text-sm flex items-center gap-2">
+            <span>📋</span> Plantilla
+          </button>
+          
+          <button onClick={() => fileInputRef.current?.click()} disabled={importing} className="bg-amber-500 text-white px-4 py-2.5 rounded-lg hover:bg-amber-600 transition-all shadow-md font-bold text-sm flex items-center gap-2 disabled:opacity-50">
+            <span>📤</span> {importing ? '...' : 'Importar'}
+          </button>
+
+          <button onClick={handleExportarExcel} disabled={exporting} className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg hover:bg-emerald-700 transition-all shadow-md font-bold text-sm flex items-center gap-2 disabled:opacity-50">
+            <span>📥</span> {exporting ? '...' : 'Exportar'}
+          </button>
+
+          <Link href="/usuarios/nuevo" className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-all shadow-md font-bold text-sm flex items-center gap-2">
+            <span>➕</span> Registrar Personal
+          </Link>
+        </div>
       </div>
 
       {/* FILTROS */}
@@ -148,7 +263,7 @@ export default function UsuariosPage() {
         </div>
       </div>
 
-      {/* TABLA */}
+      {/* TABLA DE USUARIOS */}
       <div className="bg-white shadow-sm rounded-t-xl overflow-x-auto border border-gray-200">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className={mostrarInactivos ? "bg-red-50" : "bg-blue-50"}>
@@ -199,7 +314,7 @@ export default function UsuariosPage() {
         </table>
       </div>
 
-      {/* CONTROLES DE PAGINACIÓN */}
+      {/* PAGINACIÓN */}
       {!isLoading && totalPaginas > 1 && (
         <div className="bg-white px-4 py-3 border border-t-0 border-gray-200 rounded-b-xl flex items-center justify-between sm:px-6">
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
@@ -230,7 +345,6 @@ export default function UsuariosPage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

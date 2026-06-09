@@ -1,8 +1,11 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-import useSWR from 'swr'; // 👈 Importamos SWR
+import useSWR from 'swr';
+// 🌟 Importamos los mismos utilitarios universales de Excel
+import { exportToExcel, downloadExcelTemplate } from '@/utils/excelExport';
+import { importFromExcel } from '@/utils/excelImport';
 
 // 🌟 1. INTERFACES PARA TYPESCRIPT
 interface EquipoVinculado {
@@ -21,6 +24,7 @@ interface Periferico {
   detalle_tecnico: string | null;
   estado_fisico: string;
   estado?: string;
+  id_equipo?: number | null; // 🌟 ID de enlace con equipos
   equipos: EquipoVinculado | null;
 }
 
@@ -49,8 +53,8 @@ const fetchPerifericos = async ([key, search, tipo, estado, paginaActual]: [stri
     );
   }
 
-  if (tipo) query = query.ilike('tipo_periferico', tipo);
-  if (estado) query = query.ilike('estado_fisico', estado);
+  if (tipo) query = query.eq('tipo_periferico', tipo);
+  if (estado) query = query.eq('estado_fisico', estado);
 
   const from = (paginaActual - 1) * ITEMS_POR_PAGINA;
   const to = from + ITEMS_POR_PAGINA - 1;
@@ -74,6 +78,11 @@ export default function PerifericosPage() {
   const [paginaActual, setPaginaActual] = useState(1);
   const ITEMS_POR_PAGINA = 10;
 
+  // Estados para Excel
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Resetear a página 1 si cambian los filtros
   useEffect(() => {
     setPaginaActual(1);
@@ -90,7 +99,106 @@ export default function PerifericosPage() {
   const totalPerifericos = data?.total || 0;
   const totalPaginas = Math.ceil(totalPerifericos / ITEMS_POR_PAGINA);
 
-  // 🌟 5. MUTATE PARA ELIMINAR SIN RECARGAR
+  // 🌟 5. ACCIONES EXCEL PARA PERIFÉRICOS
+  const handleDescargarPlantilla = async () => {
+    try {
+      const columnasPlantilla = [
+        'cod_patrimonio_verde', 'cod_patrimonio_azul', 'tipo_periferico', 
+        'marca', 'modelo', 'n_serie', 'detalle_tecnico', 'estado_fisico', 'id_equipo'
+      ];
+      
+      const filaEjemplo = [
+        'V-9921', 'A-0442', 'Monitor', 'HP', 'ProDisplay P223', 'CN441022XX', 'Pantilla LED 21.5 pulgadas', 'OPERATIVO', ''
+      ];
+
+      await downloadExcelTemplate(columnasPlantilla, 'Plantilla_Carga_Perifericos', filaEjemplo);
+    } catch (err) {
+      alert('Error al generar la plantilla');
+    }
+  };
+
+  const handleImportarExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImporting(true);
+      
+      // Columnas mínimas requeridas para periféricos
+      const columnasEsperadas = ['tipo_periferico', 'marca', 'estado_fisico'];
+      const datosCrudos = await importFromExcel(file, columnasEsperadas);
+
+      const datosParaSupabase = datosCrudos.map((fila) => ({
+        cod_patrimonio_verde: fila['cod_patrimonio_verde'] || null,
+        cod_patrimonio_azul: fila['cod_patrimonio_azul'] || null,
+        tipo_periferico: fila['tipo_periferico'],
+        marca: fila['marca'],
+        modelo: fila['modelo'] || null,
+        n_serie: fila['n_serie'] || null,
+        detalle_tecnico: fila['detalle_tecnico'] || null,
+        estado_fisico: fila['estado_fisico'] || 'OPERATIVO',
+        id_equipo: fila['id_equipo'] ? parseInt(fila['id_equipo']) : null
+      }));
+
+      const { error } = await supabase.from('perifericos').insert(datosParaSupabase);
+      if (error) throw error;
+
+      alert(`✅ ¡Se importaron ${datosParaSupabase.length} periféricos con éxito!`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      mutate();
+
+    } catch (err: any) {
+      alert('Error al importar periféricos: ' + err.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleExportarExcel = async () => {
+    try {
+      setExporting(true);
+      
+      let query = supabase.from('perifericos').select('*, equipos(nombre_red_pc)').is('deleted_at', null);
+      
+      if (debouncedSearch) {
+        query = query.or(`cod_patrimonio_azul.ilike.%${debouncedSearch}%,cod_patrimonio_verde.ilike.%${debouncedSearch}%,marca.ilike.%${debouncedSearch}%,modelo.ilike.%${debouncedSearch}%,n_serie.ilike.%${debouncedSearch}%`);
+      }
+      if (filtroTipo) query = query.eq('tipo_periferico', filtroTipo);
+      if (filtroEstado) query = query.eq('estado_fisico', filtroEstado);
+
+      const { data, error: fetchError } = await query.order('tipo_periferico', { ascending: true });
+      if (fetchError) throw fetchError;
+
+      // Estructuramos la información agregando el tipado exacto (eq: any) para evitar errores de compilación
+      const dataMapeada = (data || []).map((eq: any) => ({
+        ...eq,
+        serie_final: eq.n_serie || eq.numero_serie || '-',
+        estado_final: eq.estado_fisico || eq.estado || 'OPERATIVO',
+        pc_vinculada: eq.equipos?.nombre_red_pc ? eq.equipos.nombre_red_pc : 'En Almacén'
+      }));
+
+      const columnasReporte = [
+        { header: 'Patrimonio Verde', key: 'cod_patrimonio_verde', width: 18 },
+        { header: 'Patrimonio Azul', key: 'cod_patrimonio_azul', width: 18 },
+        { header: 'Tipo Periférico', key: 'tipo_periferico', width: 18 },
+        { header: 'Marca', key: 'marca', width: 15 },
+        { header: 'Modelo', key: 'modelo', width: 15 },
+        { header: 'Número de Serie', key: 'serie_final', width: 20 },
+        { header: 'Detalle Técnico', key: 'detalle_tecnico', width: 30 },
+        { header: 'Estado Físico', key: 'estado_final', width: 15 },
+        { header: 'Asignación PC', key: 'pc_vinculada', width: 20 },
+      ];
+
+      await exportToExcel('Reporte e Inventario de Periféricos', columnasReporte, dataMapeada, 'Reporte_Perifericos');
+
+    } catch (err: any) {
+      alert('Error al exportar Excel: ' + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // 🌟 6. MUTATE PARA ELIMINAR SIN RECARGAR
   const handleEliminar = async (id: number, tipo: string, marca: string) => {
     const confirmacion = window.confirm(`¿Estás seguro de enviar a la papelera el periférico: ${tipo} ${marca}?`);
     if (!confirmacion) return;
@@ -105,24 +213,19 @@ export default function PerifericosPage() {
       return; 
     }
     
-    mutate(); // 👈 Recargamos la caché instantáneamente
+    mutate();
   };
 
   const getBadgeEstado = (estado: string) => {
     const est = (estado || '').toUpperCase();
     switch(est) {
-      case 'OPERATIVO': 
-        return 'bg-green-100 text-green-800 border-green-200';
+      case 'OPERATIVO': return 'bg-green-100 text-green-800 border-green-200';
       case 'GARANTIA': 
-      case 'EN GARANTÍA':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'OBSOLETO': 
-        return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'EN GARANTÍA': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'OBSOLETO': return 'bg-amber-100 text-amber-800 border-amber-200';
       case 'BAJA': 
-      case 'DE BAJA':
-        return 'bg-red-100 text-red-800 border-red-200';
-      default: 
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'DE BAJA': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -136,9 +239,24 @@ export default function PerifericosPage() {
           <p className="text-gray-500 text-sm">Monitores, Impresoras, UPS y componentes informáticos.</p>
         </div>
         
-        <div className="flex gap-2">
+        {/* BOTONES INTERACTIVOS DE EXCEL */}
+        <div className="flex gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap">
+          <input type="file" accept=".xlsx, .xls" ref={fileInputRef} className="hidden" onChange={handleImportarExcel} />
+
+          <button onClick={handleDescargarPlantilla} className="bg-white text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-50 transition-all shadow-sm font-bold text-sm flex items-center gap-2">
+            <span>📋</span> Plantilla
+          </button>
+          
+          <button onClick={() => fileInputRef.current?.click()} disabled={importing} className="bg-amber-500 text-white px-4 py-2.5 rounded-lg hover:bg-amber-600 transition-all shadow-md font-bold text-sm flex items-center gap-2 disabled:opacity-50">
+            <span>📤</span> {importing ? '...' : 'Importar'}
+          </button>
+
+          <button onClick={handleExportarExcel} disabled={exporting} className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg hover:bg-emerald-700 transition-all shadow-md font-bold text-sm flex items-center gap-2 disabled:opacity-50">
+            <span>📥</span> {exporting ? '...' : 'Exportar'}
+          </button>
+
           <Link href="/perifericos/papelera" className="bg-red-50 text-red-600 border border-red-200 px-5 py-2.5 rounded-lg hover:bg-red-100 transition-all font-bold text-sm flex items-center gap-2">
-            <span>🗑️</span> Ver Papelera
+            <span>🗑️</span> Papelera
           </Link>
           <Link href="/perifericos/nuevo" className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-all shadow-md font-bold text-sm flex items-center gap-2">
             <span>➕</span> Registrar Periférico
@@ -146,6 +264,7 @@ export default function PerifericosPage() {
         </div>
       </div>
 
+      {/* BARRA DE FILTROS */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col lg:flex-row gap-4 items-end justify-between">
         <div className="w-full lg:w-2/5">
           <label className="block text-xs font-bold text-gray-500 mb-1">Buscar por código, serie o marca</label>
@@ -192,6 +311,7 @@ export default function PerifericosPage() {
         </div>
       </div>
 
+      {/* TABLA PRINCIPAL */}
       <div className="bg-white shadow-sm rounded-t-xl overflow-x-auto border border-gray-200">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-blue-50">

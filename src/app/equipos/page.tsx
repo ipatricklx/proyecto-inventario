@@ -1,10 +1,13 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-import useSWR from 'swr'; // 👈 Importamos SWR
+import useSWR from 'swr';
+// 🌟 Importamos los utilitarios de Excel
+import { exportToExcel, downloadExcelTemplate } from '@/utils/excelExport';
+import { importFromExcel } from '@/utils/excelImport';
 
-// 🌟 1. INTERFACES PARA TYPESCRIPT (Adiós al error de 'any')
+// 🌟 1. INTERFACES
 interface Ubicacion {
   servicio: string;
   area: string;
@@ -17,6 +20,7 @@ interface Equipo {
   tipo_equipo: string;
   marca: string;
   modelo: string;
+  numero_serie?: string;
   estado: string;
   ubicaciones: Ubicacion | null;
 }
@@ -61,17 +65,19 @@ const fetchEquipos = async ([key, search, tipo, estado, paginaActual]: [string, 
 };
 
 export default function EquiposPage() {
-  // Estados para los filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipo, setFilterTipo] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
   const debouncedSearch = useDebounce(searchTerm, 500);
 
-  // Estados de paginación
   const [paginaActual, setPaginaActual] = useState(1);
   const ITEMS_POR_PAGINA = 10;
 
-  // Resetear a página 1 si cambian los filtros
+  // 🌟 Estados para Excel
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     setPaginaActual(1);
   }, [debouncedSearch, filterTipo, filterEstado]);
@@ -87,7 +93,132 @@ export default function EquiposPage() {
   const totalEquipos = data?.total || 0;
   const totalPaginas = Math.ceil(totalEquipos / ITEMS_POR_PAGINA);
 
-  // 🌟 5. MUTATE PARA ELIMINAR SIN RECARGAR
+  // 🌟 5. FUNCIONES DE EXCEL
+  const handleDescargarPlantilla = async () => {
+    try {
+      // Ponemos TODOS los campos que mencionaste para una carga masiva super completa
+      const columnasPlantilla = [
+        'cod_patrimonio', 'cod_patrimonio_verde', 'tipo_equipo', 'marca', 'modelo', 'numero_serie', 'id_ubicacion', 'estado',
+        'procesador', 'memoria_ram', 'almacenamiento', 'direccion_ip', 'direccion_mac', 'nombre_red_pc', 'clave_vnc',
+        'sistema_operativo', 'antivirus', 'tiene_sap', 'tiene_ses', 'tiene_internet', 'en_dominio'
+      ];
+      
+      const filaEjemplo = [
+        '01105291', 'V-001', 'CPU', 'DELL', 'OPTIPLEX 7090', 'SN-98765', '15', 'OPERATIVO',
+        'Core i7', '16GB', '512GB SSD', '192.168.1.50', '00:1B:44:11:3A:B7', 'PC-RECEPCION', '1234',
+        'Windows 10 Pro', 'Windows Defender', 'TRUE', 'FALSE', 'TRUE', 'TRUE'
+      ];
+
+      await downloadExcelTemplate(columnasPlantilla, 'Plantilla_Carga_Equipos', filaEjemplo);
+    } catch (err) {
+      alert('Error al generar la plantilla');
+    }
+  };
+
+  const handleImportarExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImporting(true);
+      
+      // Columnas mínimas obligatorias para que no falle la BD
+      const columnasEsperadas = ['tipo_equipo', 'marca', 'modelo', 'id_ubicacion'];
+      const datosCrudos = await importFromExcel(file, columnasEsperadas);
+
+      const datosParaSupabase = datosCrudos.map((fila) => ({
+        cod_patrimonio: fila['cod_patrimonio'] || null,
+        cod_patrimonio_verde: fila['cod_patrimonio_verde'] || null,
+        tipo_equipo: fila['tipo_equipo'],
+        marca: fila['marca'],
+        modelo: fila['modelo'],
+        numero_serie: fila['numero_serie'] || null,
+        id_ubicacion: parseInt(fila['id_ubicacion']),
+        estado: fila['estado'] || 'OPERATIVO',
+        
+        // Red y Hardware (si vienen vacíos, se pone null)
+        procesador: fila['procesador'] || null,
+        memoria_ram: fila['memoria_ram'] || null,
+        almacenamiento: fila['almacenamiento'] || null,
+        direccion_ip: fila['direccion_ip'] || null,
+        direccion_mac: fila['direccion_mac'] || null,
+        nombre_red_pc: fila['nombre_red_pc'] || null,
+        clave_vnc: fila['clave_vnc'] || null,
+        
+        // Software
+        sistema_operativo: fila['sistema_operativo'] || null,
+        antivirus: fila['antivirus'] || null,
+
+        // Booleanos (Convertimos 'TRUE' texto a booleano real)
+        tiene_sap: String(fila['tiene_sap']).toUpperCase() === 'TRUE',
+        tiene_ses: String(fila['tiene_ses']).toUpperCase() === 'TRUE',
+        tiene_internet: String(fila['tiene_internet']).toUpperCase() === 'TRUE',
+        en_dominio: String(fila['en_dominio']).toUpperCase() === 'TRUE',
+      }));
+
+      const { error } = await supabase.from('equipos').insert(datosParaSupabase);
+      if (error) throw error;
+
+      alert(`✅ ¡Se importaron ${datosParaSupabase.length} equipos con éxito!`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      mutate();
+
+    } catch (err: any) {
+      alert('Error al importar Excel: ' + err.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleExportarExcel = async () => {
+    try {
+      setExporting(true);
+      
+      // Hacemos una consulta sin paginación para exportar TODO lo que coincida con el filtro
+      let query = supabase.from('equipos').select('*, ubicaciones(servicio, area)').is('deleted_at', null);
+      
+      if (debouncedSearch) {
+        query = query.or(`cod_patrimonio.ilike.%${debouncedSearch}%,cod_patrimonio_verde.ilike.%${debouncedSearch}%,marca.ilike.%${debouncedSearch}%,modelo.ilike.%${debouncedSearch}%`);
+      }
+      if (filterTipo) query = query.eq('tipo_equipo', filterTipo);
+      if (filterEstado) query = query.eq('estado', filterEstado);
+
+      const { data, error: fetchError } = await query.order('created_at', { ascending: false });
+      if (fetchError) throw fetchError;
+
+      // Mapeamos los datos para que el Excel salga bonito
+     const dataMapeada = (data || []).map((eq: any) => ({
+        ...eq,
+        ubicacion_completa: eq.ubicaciones ? `${eq.ubicaciones.servicio} - ${eq.ubicaciones.area}` : 'Sin asignar',
+        sap: eq.tiene_sap ? 'SÍ' : 'NO',
+        internet: eq.tiene_internet ? 'SÍ' : 'NO'
+      }));
+
+      const columnasReporte = [
+        { header: 'Patrimonio', key: 'cod_patrimonio', width: 15 },
+        { header: 'Pat. Verde', key: 'cod_patrimonio_verde', width: 15 },
+        { header: 'Tipo Equipo', key: 'tipo_equipo', width: 20 },
+        { header: 'Marca', key: 'marca', width: 15 },
+        { header: 'Modelo', key: 'modelo', width: 20 },
+        { header: 'N° Serie', key: 'numero_serie', width: 20 },
+        { header: 'Ubicación', key: 'ubicacion_completa', width: 35 },
+        { header: 'IP', key: 'direccion_ip', width: 15 },
+        { header: 'SO', key: 'sistema_operativo', width: 20 },
+        { header: 'Tiene SAP', key: 'sap', width: 10 },
+        { header: 'Internet', key: 'internet', width: 10 },
+        { header: 'Estado', key: 'estado', width: 15 },
+      ];
+
+      await exportToExcel('Reporte General de Equipos', columnasReporte, dataMapeada, 'Reporte_Equipos');
+
+    } catch (err: any) {
+      alert('Error al exportar Excel: ' + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // 🌟 6. MUTATE PARA ELIMINAR SIN RECARGAR
   const handleDelete = async (id_equipo: number, cod_patrimonio: string) => {
     const confirmacion = window.confirm(`¿Estás seguro de enviar a la papelera el equipo patrimonial ${cod_patrimonio || 'sin código'}?`);
     if (!confirmacion) return;
@@ -102,7 +233,7 @@ export default function EquiposPage() {
       return;
     }
     
-    mutate(); // 👈 Actualiza la caché al instante
+    mutate();
   };
 
   const getColorEstado = (estado: string) => {
@@ -125,10 +256,31 @@ export default function EquiposPage() {
           <p className="text-gray-500 text-sm">Directorio patrimonial y control de estaciones de trabajo vigentes.</p>
         </div>
         
-        <div className="flex gap-3">
+        {/* GRUPO DE BOTONES SUPERIOR */}
+        <div className="flex gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap">
+          
+          {/* Input oculto para cargar archivo */}
+          <input type="file" accept=".xlsx, .xls" ref={fileInputRef} className="hidden" onChange={handleImportarExcel} />
+
+          {/* Botón Plantilla */}
+          <button onClick={handleDescargarPlantilla} className="bg-white text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-50 transition-all shadow-sm font-bold text-sm flex items-center gap-2">
+            <span>📋</span> Plantilla
+          </button>
+          
+          {/* Botón Importar */}
+          <button onClick={() => fileInputRef.current?.click()} disabled={importing} className="bg-amber-500 text-white px-4 py-2.5 rounded-lg hover:bg-amber-600 transition-all shadow-md font-bold text-sm flex items-center gap-2 disabled:opacity-50">
+            <span>📤</span> {importing ? '...' : 'Importar'}
+          </button>
+
+          {/* Botón Exportar */}
+          <button onClick={handleExportarExcel} disabled={exporting} className="bg-emerald-600 text-white px-4 py-2.5 rounded-lg hover:bg-emerald-700 transition-all shadow-md font-bold text-sm flex items-center gap-2 disabled:opacity-50">
+            <span>📥</span> {exporting ? '...' : 'Exportar'}
+          </button>
+
           <Link href="/equipos/papelera" className="bg-red-50 text-red-600 border border-red-200 px-4 py-2.5 rounded-lg hover:bg-red-100 transition-all font-bold text-sm flex items-center gap-2 shadow-sm">
-            <span>🗑️</span> Ver Papelera
+            <span>🗑️</span> Papelera
           </Link>
+          
           <Link href="/nuevo-equipo" className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-all shadow-md font-bold text-sm flex items-center gap-2">
             <span>➕</span> Nuevo Equipo
           </Link>
