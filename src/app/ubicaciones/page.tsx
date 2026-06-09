@@ -2,34 +2,98 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import useSWR from 'swr';
 
-export default function UbicacionesPage() {
-  const [ubicaciones, setUbicaciones] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [mostrarInactivos, setMostrarInactivos] = useState(false); // 👈 Nuevo estado para la papelera
+// 🌟 1. INTERFACES PARA TIPADO ESTRICTO
+interface Ubicacion {
+  id_ubicacion: number;
+  red_asistencial: string;
+  centro_asistencial: string;
+  departamento: string;
+  servicio: string;
+  area: string | null;
+  estado: 'ACTIVO' | 'INACTIVO' | null;
+}
 
+interface UbicacionesResponse {
+  data: Ubicacion[];
+  count: number;
+}
+
+const ITEMS_POR_PAGINA = 10;
+
+// 🌟 2. HOOK DE DEBOUNCE (Se mantiene igual)
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
   useEffect(() => {
-    getUbicaciones();
-  }, []);
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debouncedValue;
+}
 
-  async function getUbicaciones() {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('ubicaciones')
-      .select('*')
-      .order('departamento', { ascending: true })
-      .order('servicio', { ascending: true });
-      
-    if (error) {
-      console.error('Error al cargar ubicaciones:', error);
-    } else if (data) {
-      setUbicaciones(data);
-    }
-    setLoading(false);
+// 🌟 3. FETCHER DE SWR (Recibe el array de dependencias como argumentos)
+const fetchUbicaciones = async ([_key, search, inactivos, page]: [string, string, boolean, number]): Promise<UbicacionesResponse> => {
+  let query = supabase
+    .from('ubicaciones')
+    .select('*', { count: 'exact' });
+    
+  if (search) {
+    query = query.or(`departamento.ilike.%${search}%,servicio.ilike.%${search}%,area.ilike.%${search}%`);
   }
 
-  // Baja lógica en lugar de borrado físico
+  if (inactivos) {
+    query = query.eq('estado', 'INACTIVO');
+  } else {
+    query = query.or('estado.eq.ACTIVO,estado.is.null');
+  }
+
+  const from = (page - 1) * ITEMS_POR_PAGINA;
+  const to = from + ITEMS_POR_PAGINA - 1;
+  
+  query = query
+    .range(from, to)
+    .order('departamento', { ascending: true })
+    .order('servicio', { ascending: true });
+
+  const { data, error, count } = await query;
+    
+  if (error) throw new Error(error.message);
+  
+  return { 
+    data: (data as Ubicacion[]) || [], 
+    count: count || 0 
+  };
+};
+
+export default function UbicacionesPage() {
+  // Estados para los filtros y paginación
+  const [searchTerm, setSearchTerm] = useState('');
+  const [mostrarInactivos, setMostrarInactivos] = useState(false);
+  const [paginaActual, setPaginaActual] = useState(1);
+
+  const debouncedSearch = useDebounce(searchTerm, 500);
+
+  // Resetear a página 1 si cambian los filtros
+  useEffect(() => {
+    setPaginaActual(1);
+  }, [debouncedSearch, mostrarInactivos]);
+
+  // 🌟 4. USO DE SWR CON ARRAY KEY Y KEEP_PREVIOUS_DATA
+  const { data: response, error, isLoading, mutate } = useSWR<UbicacionesResponse>(
+    ['ubicaciones', debouncedSearch, mostrarInactivos, paginaActual], // Array como llave
+    fetchUbicaciones,
+    {
+      keepPreviousData: true, // Mantiene la data actual en pantalla mientras hace fetch de la nueva página
+      revalidateOnFocus: false, // Opcional: evita refrescar si el usuario cambia de pestaña rápido para no perder su posición
+    }
+  );
+
+  const ubicaciones = response?.data || [];
+  const totalUbicaciones = response?.count || 0;
+  const totalPaginas = Math.ceil(totalUbicaciones / ITEMS_POR_PAGINA);
+
+  // 🌟 5. ACCIONES (Usan mutate() en lugar de getUbicaciones())
   const handleDesactivar = async (id: number, nombre: string) => {
     const confirmacion = window.confirm(`¿Estás seguro de desactivar el área de ${nombre}? Ya no se podrán asignar nuevos equipos aquí.`);
     if (!confirmacion) return;
@@ -44,11 +108,9 @@ export default function UbicacionesPage() {
       return;
     }
     
-    // Actualizamos el estado local sin recargar la página
-    setUbicaciones(ubicaciones.map(u => u.id_ubicacion === id ? { ...u, estado: 'INACTIVO' } : u));
+    mutate(); // Recargar la data de la página actual
   };
 
-  //  Restaurar área
   const handleRestaurar = async (id: number, nombre: string) => {
     const confirmacion = window.confirm(`¿Deseas restaurar el área de ${nombre}? Volverá a estar disponible.`);
     if (!confirmacion) return;
@@ -63,23 +125,12 @@ export default function UbicacionesPage() {
       return;
     }
     
-    setUbicaciones(ubicaciones.map(u => u.id_ubicacion === id ? { ...u, estado: 'ACTIVO' } : u));
+    mutate(); // Recargar la data de la página actual
   };
 
-  // Filtrado de la tabla (por texto Y por estado)
-  const filtradas = ubicaciones.filter(u => {
-    const term = searchTerm.toLowerCase();
-    const coincideTexto = (
-      u.departamento?.toLowerCase().includes(term) ||
-      u.servicio?.toLowerCase().includes(term) ||
-      u.area?.toLowerCase().includes(term)
-    );
-    // activo o inactivo según el toggle
-    const estadoActual = u.estado || 'ACTIVO';
-    const coincideEstado = mostrarInactivos ? estadoActual === 'INACTIVO' : estadoActual === 'ACTIVO';
-
-    return coincideTexto && coincideEstado;
-  });
+  if (error) {
+    return <div className="p-4 text-red-500 text-center font-bold">Error al cargar la estructura: {error.message}</div>;
+  }
 
   return (
     <div className="animate-fadeIn text-gray-900 p-4 max-w-7xl mx-auto">
@@ -105,7 +156,7 @@ export default function UbicacionesPage() {
           />
         </div>
         
-        {/*PAPELERA */}
+        {/* PAPELERA */}
         <div className="w-full sm:w-auto flex items-center bg-gray-50 p-2 rounded-lg border border-gray-200">
           <label className="flex items-center cursor-pointer">
             <div className="relative">
@@ -120,7 +171,10 @@ export default function UbicacionesPage() {
         </div>
       </div>
 
-      <div className="bg-white shadow-sm rounded-xl overflow-x-auto border border-gray-200">
+      <div className="bg-white shadow-sm rounded-t-xl overflow-x-auto border border-gray-200 relative">
+        {/* Indicador visual suave de recarga durante el keepPreviousData */}
+        {isLoading && <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500 animate-pulse z-10"></div>}
+
         <table className="min-w-full divide-y divide-gray-200">
           <thead className={mostrarInactivos ? "bg-red-50" : "bg-blue-50"}>
             <tr>
@@ -132,13 +186,13 @@ export default function UbicacionesPage() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
-            {loading ? (
-              <tr><td colSpan={5} className="text-center py-8 text-gray-400">Cargando estructura...</td></tr>
-            ) : filtradas.length === 0 ? (
+            {isLoading && ubicaciones.length === 0 ? (
+              <tr><td colSpan={5} className="text-center py-8 text-gray-400 animate-pulse">Cargando estructura...</td></tr>
+            ) : ubicaciones.length === 0 ? (
               <tr><td colSpan={5} className="text-center py-8 text-gray-500">No se encontraron áreas.</td></tr>
             ) : (
-              filtradas.map((ubi) => (
-                <tr key={ubi.id_ubicacion} className={`hover:bg-gray-50 ${mostrarInactivos ? 'opacity-70' : ''}`}>
+              ubicaciones.map((ubi) => (
+                <tr key={ubi.id_ubicacion} className={`hover:bg-gray-50 transition-opacity ${mostrarInactivos ? 'opacity-70' : ''} ${isLoading ? 'opacity-50' : 'opacity-100'}`}>
                   <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
                     <p className="font-bold">{ubi.red_asistencial}</p>
                     <p>{ubi.centro_asistencial}</p>
@@ -170,6 +224,38 @@ export default function UbicacionesPage() {
           </tbody>
         </table>
       </div>
+
+      {/* CONTROLES DE PAGINACIÓN */}
+      {totalPaginas > 1 && (
+        <div className="bg-white px-4 py-3 border border-t-0 border-gray-200 rounded-b-xl flex items-center justify-between sm:px-6">
+          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                Mostrando página <span className="font-medium">{paginaActual}</span> de <span className="font-medium">{totalPaginas}</span> 
+                {' '} ({totalUbicaciones} resultados)
+              </p>
+            </div>
+            <div>
+              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                <button
+                  onClick={() => setPaginaActual(p => Math.max(1, p - 1))}
+                  disabled={paginaActual === 1 || isLoading}
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 transition-colors"
+                >
+                  Anterior
+                </button>
+                <button
+                  onClick={() => setPaginaActual(p => Math.min(totalPaginas, p + 1))}
+                  disabled={paginaActual === totalPaginas || isLoading}
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 transition-colors"
+                >
+                  Siguiente
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

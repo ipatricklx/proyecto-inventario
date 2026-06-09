@@ -2,53 +2,107 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import useSWR from 'swr'; // 👈 Importamos SWR
+
+// 🌟 1. INTERFACES PARA TYPESCRIPT (Adiós al error de 'any')
+interface Ubicacion {
+  servicio: string;
+  area: string;
+}
+
+interface Equipo {
+  id_equipo: number;
+  cod_patrimonio: string | null;
+  cod_patrimonio_verde: string | null;
+  tipo_equipo: string;
+  marca: string;
+  modelo: string;
+  estado: string;
+  ubicaciones: Ubicacion | null;
+}
+
+// 🌟 2. HOOK DE DEBOUNCE
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debouncedValue;
+}
+
+// 🌟 3. EL FETCHER DE SUPABASE PARA SWR
+const fetchEquipos = async ([key, search, tipo, estado, paginaActual]: [string, string, string, string, number]) => {
+  const ITEMS_POR_PAGINA = 10;
+  
+  let query = supabase
+    .from('equipos')
+    .select('*, ubicaciones (servicio, area)', { count: 'exact' })
+    .is('deleted_at', null);
+
+  if (search) {
+    query = query.or(
+      `cod_patrimonio.ilike.%${search}%,cod_patrimonio_verde.ilike.%${search}%,marca.ilike.%${search}%,modelo.ilike.%${search}%`
+    );
+  }
+
+  if (tipo) query = query.eq('tipo_equipo', tipo);
+  if (estado) query = query.eq('estado', estado);
+
+  const from = (paginaActual - 1) * ITEMS_POR_PAGINA;
+  const to = from + ITEMS_POR_PAGINA - 1;
+  
+  query = query.range(from, to).order('created_at', { ascending: false });
+
+  const { data, error, count } = await query;
+  if (error) throw new Error(error.message);
+  
+  return { equipos: data as Equipo[], total: count || 0 };
+};
 
 export default function EquiposPage() {
-  const [equipos, setEquipos] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
   // Estados para los filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipo, setFilterTipo] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 500);
 
+  // Estados de paginación
+  const [paginaActual, setPaginaActual] = useState(1);
+  const ITEMS_POR_PAGINA = 10;
+
+  // Resetear a página 1 si cambian los filtros
   useEffect(() => {
-    getEquipos();
-  }, []);
+    setPaginaActual(1);
+  }, [debouncedSearch, filterTipo, filterEstado]);
 
-  async function getEquipos() {
-    const { data, error } = await supabase
-      .from('equipos')
-      .select(`
-        *,
-        ubicaciones (servicio, area)
-      `)
-      .eq('activo', true)
-      .order('created_at', { ascending: false });
-      
-    if (error) {
-      console.error('Error al cargar equipos:', error);
-    } else if (data) {
-      setEquipos(data);
-    }
-    setLoading(false);
-  }
+  // 🌟 4. LA MAGIA DE SWR
+  const { data, error, isLoading, mutate } = useSWR(
+    ['equipos', debouncedSearch, filterTipo, filterEstado, paginaActual],
+    fetchEquipos,
+    { keepPreviousData: true }
+  );
 
+  const equipos = data?.equipos || [];
+  const totalEquipos = data?.total || 0;
+  const totalPaginas = Math.ceil(totalEquipos / ITEMS_POR_PAGINA);
+
+  // 🌟 5. MUTATE PARA ELIMINAR SIN RECARGAR
   const handleDelete = async (id_equipo: number, cod_patrimonio: string) => {
-    const confirmacion = window.confirm(`¿Estás seguro de que deseas dar de baja y ocultar el equipo patrimonial ${cod_patrimonio}?`);
+    const confirmacion = window.confirm(`¿Estás seguro de enviar a la papelera el equipo patrimonial ${cod_patrimonio || 'sin código'}?`);
     if (!confirmacion) return;
 
-    const { error: errorEquipo } = await supabase
+    const { error } = await supabase
       .from('equipos')
-      .update({ activo: false, estado: 'BAJA' })
+      .update({ deleted_at: new Date().toISOString() })
       .eq('id_equipo', id_equipo);
     
-    if (errorEquipo) {
-      alert('Error al desactivar el activo: ' + errorEquipo.message);
+    if (error) {
+      alert('Error al enviar a la papelera: ' + error.message);
       return;
     }
-
-    setEquipos(equipos.filter(eq => eq.id_equipo !== id_equipo));
+    
+    mutate(); // 👈 Actualiza la caché al instante
   };
 
   const getColorEstado = (estado: string) => {
@@ -61,23 +115,7 @@ export default function EquiposPage() {
     }
   };
 
-  // Lógica de filtrado en el frontend
-  const equiposFiltrados = equipos.filter((equipo) => {
-    const term = searchTerm.toLowerCase();
-    
-    const matchSearch = 
-      equipo.cod_patrimonio?.toLowerCase().includes(term) ||
-      equipo.cod_patrimonio_verde?.toLowerCase().includes(term) || // 👈 Búsqueda por código verde
-      equipo.marca?.toLowerCase().includes(term) ||
-      equipo.modelo?.toLowerCase().includes(term) ||
-      equipo.ubicaciones?.servicio?.toLowerCase().includes(term) ||
-      equipo.ubicaciones?.area?.toLowerCase().includes(term);
-    
-    const matchTipo = filterTipo ? equipo.tipo_equipo?.toUpperCase() === filterTipo.toUpperCase() : true;
-    const matchEstado = filterEstado ? equipo.estado?.toUpperCase() === filterEstado.toUpperCase() : true;
-
-    return matchSearch && matchTipo && matchEstado;
-  });
+  if (error) return <div className="text-red-500 p-4 text-center">Error al cargar datos: {error.message}</div>;
 
   return (
     <div className="animate-fadeIn text-gray-900 p-4 max-w-7xl mx-auto">
@@ -88,7 +126,7 @@ export default function EquiposPage() {
         </div>
         
         <div className="flex gap-3">
-          <Link href="/equipos/papelera" className="bg-gray-100 text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-200 transition-all font-medium text-sm flex items-center gap-2 shadow-sm">
+          <Link href="/equipos/papelera" className="bg-red-50 text-red-600 border border-red-200 px-4 py-2.5 rounded-lg hover:bg-red-100 transition-all font-bold text-sm flex items-center gap-2 shadow-sm">
             <span>🗑️</span> Ver Papelera
           </Link>
           <Link href="/nuevo-equipo" className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-all shadow-md font-bold text-sm flex items-center gap-2">
@@ -100,10 +138,10 @@ export default function EquiposPage() {
       {/* BARRA DE FILTROS */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row gap-4">
         <div className="flex-1">
-          <label className="block text-xs font-bold text-gray-500 mb-1">Buscar (Patrimonio, Marca, Modelo, Ubicación)</label>
+          <label className="block text-xs font-bold text-gray-500 mb-1">Buscar (Patrimonio, Marca, Modelo)</label>
           <input 
             type="text" 
-            placeholder="Ej: 01105291, 00539420, Dell, Emergencia..." 
+            placeholder="Ej: 01105291, 00539420, Dell..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full border border-gray-300 rounded-md p-2 text-sm text-gray-900 bg-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
@@ -130,7 +168,7 @@ export default function EquiposPage() {
       </div>
 
       {/* TABLA PRINCIPAL */}
-      <div className="bg-white shadow-sm rounded-xl overflow-x-auto border border-gray-200">
+      <div className="bg-white shadow-sm rounded-t-xl overflow-x-auto border border-gray-200">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -143,15 +181,13 @@ export default function EquiposPage() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
-            {loading ? (
-              <tr><td colSpan={6} className="text-center py-12 text-gray-400 font-medium">Cargando base de datos...</td></tr>
-            ) : equiposFiltrados.length === 0 ? (
+            {isLoading ? (
+              <tr><td colSpan={6} className="text-center py-12 text-gray-400 font-medium animate-pulse">Consultando caché inteligente...</td></tr>
+            ) : equipos.length === 0 ? (
               <tr><td colSpan={6} className="text-center py-12 text-gray-500 font-medium">No se encontraron equipos con esos filtros.</td></tr>
             ) : (
-              equiposFiltrados.map((equipo) => (
+              equipos.map((equipo: Equipo) => (
                 <tr key={equipo.id_equipo} className="hover:bg-gray-50 transition-colors">
-                  
-                  {/* COD PATRIMONIO CON COLOR*/}
                   <td className="px-4 py-4 whitespace-nowrap text-sm">
                     {equipo.cod_patrimonio && (
                       <div className="font-bold text-blue-700 flex items-center gap-1.5" title="Código Azul/Principal">
@@ -187,7 +223,7 @@ export default function EquiposPage() {
                   <td className="px-4 py-4 whitespace-nowrap text-center text-sm font-medium space-x-2">
                     <Link href={`/detalles-equipo/${equipo.id_equipo}`} className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors" title="Ver Detalles">👁️</Link>
                     <Link href={`/editar-equipo/${equipo.id_equipo}`} className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors" title="Editar Equipo">⚙️</Link>
-                    <button onClick={() => handleDelete(equipo.id_equipo, equipo.cod_patrimonio)} className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-red-50 text-red-600 hover:bg-red-100 transition-colors" title="Eliminar Equipo">🗑️</button>
+                    <button onClick={() => handleDelete(equipo.id_equipo, equipo.cod_patrimonio || '')} className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-red-50 text-red-600 hover:bg-red-100 transition-colors" title="Eliminar Equipo">🗑️</button>
                   </td>
                 </tr>
               ))
@@ -195,6 +231,38 @@ export default function EquiposPage() {
           </tbody>
         </table>
       </div>
+
+      {/* CONTROLES DE PAGINACIÓN */}
+      {!isLoading && totalPaginas > 1 && (
+        <div className="bg-white px-4 py-3 border border-t-0 border-gray-200 rounded-b-xl flex items-center justify-between sm:px-6">
+          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                Mostrando página <span className="font-medium">{paginaActual}</span> de <span className="font-medium">{totalPaginas}</span> 
+                {' '} ({totalEquipos} resultados en total)
+              </p>
+            </div>
+            <div>
+              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                <button
+                  onClick={() => setPaginaActual(p => Math.max(1, p - 1))}
+                  disabled={paginaActual === 1}
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+                >
+                  Anterior
+                </button>
+                <button
+                  onClick={() => setPaginaActual(p => Math.min(totalPaginas, p + 1))}
+                  disabled={paginaActual === totalPaginas}
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+                >
+                  Siguiente
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

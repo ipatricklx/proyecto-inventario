@@ -89,27 +89,28 @@ export default function EditarEquipoPage({ params }: { params: Promise<{ id: str
     setLoading(true);
     setSaving(true);
 
-    const datosActualizar = { ...formData };
+    // Hacemos una copia de los datos
+    const datosActualizar: any = { ...formData };
     
-    // Manejo de nulos para base de datos
-    if (!datosActualizar.id_ubicacion) datosActualizar.id_ubicacion = null as any;
-    if (!datosActualizar.id_usuario) datosActualizar.id_usuario = null as any; 
+    //  LIMPIEZA GENERAL
+    Object.keys(datosActualizar).forEach((key) => {
+      if (typeof datosActualizar[key] === 'string' && datosActualizar[key].trim() === '') {
+        datosActualizar[key] = null;
+      }
+    });
+
+    delete datosActualizar.created_at;
+    delete datosActualizar.updated_at;
+
     
-    if (typeof datosActualizar.direccion_ip === 'string' && datosActualizar.direccion_ip.trim() === '') {
-      datosActualizar.direccion_ip = null as any;
-    }
-    if (typeof datosActualizar.direccion_mac === 'string' && datosActualizar.direccion_mac.trim() === '') {
-      datosActualizar.direccion_mac = null as any;
-    }
-    // Manejo del código verde vacío
-    if (typeof datosActualizar.cod_patrimonio_verde === 'string' && datosActualizar.cod_patrimonio_verde.trim() === '') {
-      datosActualizar.cod_patrimonio_verde = null as any;
-    }
+    if (!datosActualizar.id_ubicacion) datosActualizar.id_ubicacion = null;
+    if (!datosActualizar.id_usuario) datosActualizar.id_usuario = null; 
 
     if (cambiarEstado && nuevoEstado !== '') {
       datosActualizar.estado = nuevoEstado;
     }
 
+    // 3. Enviamos a Supabase
     const { error: errorEquipo } = await supabase
       .from('equipos')
       .update(datosActualizar)

@@ -101,7 +101,7 @@ export default function DetalleUsuarioPage() {
         <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-y-5 gap-x-4 w-full text-sm">
           <div>
             <p className="text-gray-400 text-xs font-semibold uppercase flex items-center gap-1.5 mb-0.5">
-              <User className="w-3..5 h-3.5 text-gray-400" /> Apellidos y Nombres
+              <User className="w-3.5 h-3.5 text-gray-400" /> Apellidos y Nombres
             </p>
             <p className="font-bold text-gray-800 text-base">{usuario.apellidos}, {usuario.nombres}</p>
           </div>
@@ -176,17 +176,35 @@ export default function DetalleUsuarioPage() {
               <tbody className="divide-y divide-gray-100 text-sm">
                 {asignaciones.map((asig) => (
                   <tr key={asig.id_asignacion} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-3.5 pl-5 font-mono font-bold text-blue-700">
-                      {asig.equipos?.nombre_red_pc || 'Desconocido'}
+                    
+                    {/* COLUMNA 1: Nombre del Equipo */}
+                    <td className="p-3.5 pl-5 font-mono font-bold">
+                      {asig.equipos?.nombre_red_pc ? (
+                        <span className="text-blue-700">{asig.equipos.nombre_red_pc}</span>
+                      ) : (
+                        <span className="text-red-500/80 italic flex items-center gap-1.5">
+                          ⚠️ Equipo Eliminado
+                        </span>
+                      )}
                     </td>
+
+                    {/* COLUMNA 2: Tipo y Marca */}
                     <td className="p-3.5 text-gray-600 font-medium">
-                      {asig.equipos?.tipo_equipo} {asig.equipos?.marca ? `· ${asig.equipos.marca}` : ''}
+                      {asig.equipos ? (
+                        <>{asig.equipos.tipo_equipo} {asig.equipos.marca ? `· ${asig.equipos.marca}` : ''}</>
+                      ) : (
+                        <span className="text-gray-400 italic text-xs">Registro purgado</span>
+                      )}
                     </td>
+
+                    {/* COLUMNA 3: Fecha */}
                     <td className="p-3.5 text-gray-600 font-medium">
                       {formatearFecha(asig.fecha_asignacion)}
                     </td>
+
+                    {/* COLUMNA 4: Estado (Fuerza a 'Histórico' si el equipo ya no existe) */}
                     <td className="p-3.5 pr-5 text-center">
-                      {asig.activo ? (
+                      {asig.activo && asig.equipos ? (
                         <span className="inline-flex items-center gap-1 bg-green-500 text-white px-2 py-0.5 rounded-lg text-xs font-bold shadow-xs">
                           <CheckCircle2 className="w-3 h-3" /> Actual
                         </span>           
@@ -196,6 +214,7 @@ export default function DetalleUsuarioPage() {
                         </span>   
                       )}
                     </td>
+                    
                   </tr>
                 ))}
               </tbody>

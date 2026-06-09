@@ -219,7 +219,7 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
               <div><p className="text-gray-400 text-xs font-semibold uppercase print:text-gray-600">Marca / Modelo</p><p className="font-bold text-gray-700 mt-0.5">{equipo.marca || 'N/A'} {equipo.modelo ? `- ${equipo.modelo}` : ''}</p></div>
               <div><p className="text-gray-400 text-xs font-semibold uppercase print:text-gray-600">Número de Serie</p><p className="font-mono font-medium text-gray-600 mt-0.5">{equipo.numero_serie || 'N/A'}</p></div>
               
-              {/* NUEVO BLOQUE: FECHA DE REGISTRO */}
+              {/*FECHA DE REGISTRO */}
               <div>
                 <p className="text-gray-400 text-xs font-semibold uppercase print:text-gray-600">Fecha de Ingreso al Sistema</p>
                 <p className="font-bold text-indigo-700 mt-0.5">
