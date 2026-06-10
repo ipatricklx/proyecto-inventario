@@ -3,7 +3,7 @@ import { useEffect, useState, use, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react'; 
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { 
   ArrowLeft, 
   Edit, 
@@ -25,6 +25,8 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
   const { id } = use(params);
   const [equipo, setEquipo] = useState<any>(null);
   const [historial, setHistorial] = useState<any[]>([]);
+  // ✅ SOLUCIÓN: Agregamos el estado para los periféricos
+  const [perifericos, setPerifericos] = useState<any[]>([]); 
   const [loading, setLoading] = useState(true);
   const [qrUrl, setQrUrl] = useState('');
   const qrRef = useRef<HTMLDivElement>(null);
@@ -41,18 +43,20 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
   }, [id]);
 
   async function getDatos() {
+    // 1. Obtener Equipo
     const { data: equipoData } = await supabase
       .from('equipos')
       .select(`
         *, 
         ubicaciones(servicio, area),
-        usuarios(nombres, apellidos, anexo, email_institucional)
+        usuarios(nombres, apellidos, anexo, email_institucional, cod_planilla)
       `)
       .eq('id_equipo', Number(id))
       .single();
 
     if (equipoData) setEquipo(equipoData);
 
+    // 2. Obtener Historial
     const { data: historialData } = await supabase
       .from('estados_equipo')
       .select('*')
@@ -61,53 +65,378 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
 
     if (historialData) setHistorial(historialData);
     
+    // Obtener Periféricos vinculados al equipo
+    const { data: perifericosData } = await supabase
+      .from('perifericos')
+      .select('*')
+      .eq('id_equipo', Number(id));
+      
+    if (perifericosData) setPerifericos(perifericosData);
+
     setLoading(false);
   }
 
-  // EXPORTAR A EXCEL
-  const exportarAExcel = () => {
+  // EXPORTAR A EXCEL (IDÉNTICO A LA IMAGEN)
+  const exportarAExcel = async () => {
     if (!equipo) return;
-    const libro = XLSX.utils.book_new();
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Ficha Técnica');
 
-    // Hoja 1: Especificaciones Técnicas (AÑADIDA LA FECHA DE REGISTRO AQUÍ)
-    const datosEquipo = [
-      { 'Categoría': 'INFORMACIÓN GENERAL', 'Propiedad': 'Fecha de Registro', 'Valor': equipo.created_at ? new Date(equipo.created_at).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No registrada' },
-      { 'Categoría': 'INFORMACIÓN GENERAL', 'Propiedad': 'Tipo de Equipo', 'Valor': equipo.tipo_equipo },
-      { 'Categoría': 'INFORMACIÓN GENERAL', 'Propiedad': 'Marca y Modelo', 'Valor': `${equipo.marca || 'N/A'} ${equipo.modelo ? `- ${equipo.modelo}` : ''}` },
-      { 'Categoría': 'INFORMACIÓN GENERAL', 'Propiedad': 'Número de Serie', 'Valor': equipo.numero_serie || 'N/A' },
-      { 'Categoría': 'INFORMACIÓN GENERAL', 'Propiedad': 'Cod. SBN', 'Valor': equipo.cod_patrimonio || 'N/A' },
-      { 'Categoría': 'HARDWARE', 'Propiedad': 'Procesador', 'Valor': equipo.procesador || 'N/A' },
-      { 'Categoría': 'HARDWARE', 'Propiedad': 'Memoria RAM', 'Valor': equipo.memoria_ram || 'N/A' },
-      { 'Categoría': 'HARDWARE', 'Propiedad': 'Almacenamiento', 'Valor': equipo.almacenamiento || 'N/A' },
-      { 'Categoría': 'RED', 'Propiedad': 'Nombre en Red', 'Valor': equipo.nombre_red_pc || 'N/A' },
-      { 'Categoría': 'RED', 'Propiedad': 'Dirección IP', 'Valor': equipo.direccion_ip || 'DHCP/N/A' },
-      { 'Categoría': 'RED', 'Propiedad': 'Dirección MAC', 'Valor': equipo.direccion_mac || 'N/A' },
-      { 'Categoría': 'SOFTWARE', 'Propiedad': 'Sistema Operativo', 'Valor': equipo.sistema_operativo || 'N/A' },
-      { 'Categoría': 'ASIGNACIÓN', 'Propiedad': 'Usuario Responsable', 'Valor': equipo.usuarios ? `${equipo.usuarios.apellidos}, ${equipo.usuarios.nombres}` : 'Almacén / Stock' },
-      { 'Categoría': 'ASIGNACIÓN', 'Propiedad': 'Ubicación Física', 'Valor': equipo.ubicaciones ? `${equipo.ubicaciones.servicio} — ${equipo.ubicaciones.area}` : 'Sin Asignar' },
+    worksheet.views = [{ showGridLines: true }];
+
+    // Título Principal
+    worksheet.mergeCells('A1:E1');
+    const titleCell = worksheet.getCell('A1');
+    titleCell.value = 'FICHA TÉCNICA Y CONTROL DE ACTIVO INFORMÁTICO';
+    titleCell.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '0070C0' } }; // Azul
+    titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    worksheet.getRow(1).height = 30;
+
+    // Sección I: Usuario / Ubicación
+    worksheet.mergeCells('A3:E3');
+    const secUser = worksheet.getCell('A3');
+    secUser.value = 'I. DATOS DEL USUARIO ASIGNADO / UBICACIÓN';
+    secUser.font = { bold: true }; secUser.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'D9E1F2' } }; // Celeste claro
+
+    worksheet.getCell('A4').value = 'Responsable:';
+    worksheet.getCell('B4').value = equipo.usuarios ? `${equipo.usuarios.apellidos}, ${equipo.usuarios.nombres}` : 'Sin Asignar';
+    worksheet.getCell('D4').value = 'Ubicación:';
+    worksheet.getCell('E4').value = equipo.ubicaciones ? `${equipo.ubicaciones.servicio} - ${equipo.ubicaciones.area}` : 'Almacén';
+
+    // Sección II: Especificaciones del Equipo
+    worksheet.mergeCells('A6:E6');
+    const secEq = worksheet.getCell('A6');
+    secEq.value = 'II. ESPECIFICACIONES TÉCNICAS DEL EQUIPO';
+    secEq.font = { bold: true }; secEq.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'D9E1F2' } };
+
+    const eqData = [
+      ['Tipo Dispositivo:', equipo.tipo_equipo, '', 'Cód. Patrimonial:', equipo.cod_patrimonio],
+      ['Marca / Modelo:', `${equipo.marca || ''} ${equipo.modelo || ''}`, '', 'Número de Serie:', equipo.numero_serie],
+      ['Procesador:', equipo.procesador, '', 'Memoria RAM:', equipo.memoria_ram],
+      ['Hostname:', equipo.nombre_red_pc, '', 'Dirección IP:', equipo.direccion_ip],
+      ['Direccion Mac:', equipo.direccion_mac, '', 'Amacenamiento:', equipo.almacenamiento],
+      ['Sistema Operativo:', equipo.sistema_operativo, '', 'Estado Actual:', equipo.estado]
     ];
-    const hojaEquipo = XLSX.utils.json_to_sheet(datosEquipo);
-    XLSX.utils.book_append_sheet(libro, hojaEquipo, 'Ficha Técnica');
 
-    // Hoja 2: Bitácora de Novedades
-    const datosHistorial = historial.map(h => ({
-      'Fecha de Registro': new Date(h.fecha || h.created_at).toLocaleDateString(),
-      'Estado Reportado': h.tipo_estado,
-      'Motivo / Detalle Técnico': h.motivo || 'Cambio operativo de estado general.'
-    }));
-    const hojaHistorial = XLSX.utils.json_to_sheet(datosHistorial);
-    XLSX.utils.book_append_sheet(libro, hojaHistorial, 'Bitácora Histórica');
+    eqData.forEach((row, idx) => {
+      worksheet.getCell(`A${7 + idx}`).value = row[0];
+      worksheet.getCell(`B${7 + idx}`).value = row[1];
+      worksheet.getCell(`D${7 + idx}`).value = row[3];
+      worksheet.getCell(`E${7 + idx}`).value = row[4];
+      worksheet.getCell(`A${7 + idx}`).font = { bold: true };
+      worksheet.getCell(`D${7 + idx}`).font = { bold: true };
+    });
 
-    // Descarga
-    XLSX.writeFile(libro, `Ficha_Equipo_${equipo.cod_patrimonio || id}.xlsx`);
+    // Sección III: Periféricos Asignados
+    let fila = 13;
+    worksheet.mergeCells(`A${fila}:E${fila}`);
+    const secPeri = worksheet.getCell(`A${fila}`);
+    secPeri.value = 'III. PERIFÉRICOS ASIGNADOS';
+    secPeri.font = { bold: true }; secPeri.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'D9E1F2' } };
+    fila++;
+
+    const headers = ['Tipo', 'Marca', 'Modelo', 'Serie', 'Patrimonio'];
+    headers.forEach((h, i) => {
+      const c = worksheet.getCell(fila, i + 1);
+      c.value = h; 
+      c.font = { bold: true, color: { argb: 'FFFFFF' } }; 
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '34495E' } }; // Gris oscuro como en tu imagen
+    });
+    fila++;
+
+    if (perifericos.length === 0) {
+      worksheet.getCell(`A${fila}`).value = 'Sin periféricos';
+    } else {
+      perifericos.forEach(p => {
+        worksheet.getRow(fila).values = [p.tipo_periferico, p.marca, p.modelo, p.n_serie || p.numero_serie, p.cod_patrimonio_verde || p.cod_patrimonio_azul];
+        fila++;
+      });
+    }
+
+    // Ancho de columnas ajustado
+    worksheet.getColumn('A').width = 20;
+    worksheet.getColumn('B').width = 25;
+    worksheet.getColumn('C').width = 15; // Espacio
+    worksheet.getColumn('D').width = 20;
+    worksheet.getColumn('E').width = 25;
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Ficha_Activo_${equipo.cod_patrimonio || id}.xlsx`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
+  // FORMATO PDF PROPIO CORREGIDO (CON LOGO, SIN HEADERS DE NAVEGADOR Y CON PERIFÉRICOS)
+ const exportarAPDF = () => {
+    if (!equipo) return;
 
-  // EXPORTAR A PDF 
-  const exportarAPDF = () => {
-    window.print();
+    const win = window.open('', '', 'height=900,width=750');
+    if (!win) return;
+
+    const fechaImpresion = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const fechaIngreso = equipo.created_at ? new Date(equipo.created_at).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' }) : 'No registrada';
+    
+    const baseUrl = window.location.origin;
+
+    // Filas de periféricos con estilos 100% unificados
+    const perifericosRows = perifericos.length === 0 
+      ? '<tr><td colspan="4" style="text-align:center; font-style:italic; padding: 5px;">No registra periféricos asociados.</td></tr>'
+      : perifericos.map(p => `
+          <tr>
+            <td style="padding: 5px; border: 1px solid #cbd5e0; font-weight: bold;">${p.tipo_periferico || 'N/A'}</td>
+            <td style="padding: 5px; border: 1px solid #cbd5e0;">${p.marca || 'N/A'} ${p.modelo ? `/ ${p.modelo}` : ''}</td>
+            <td style="padding: 5px; border: 1px solid #cbd5e0;">${p.n_serie || p.numero_serie || 'N/A'}</td>
+            <td style="padding: 5px; border: 1px solid #cbd5e0;">${p.cod_patrimonio_verde || p.cod_patrimonio_azul || 'N/A'}</td>
+          </tr>
+        `).join('');
+
+    const sistemasList = [
+      equipo.tiene_sap && 'SAP',
+      equipo.tiene_ses && 'SES',
+      equipo.tiene_winepi && 'WINEPI',
+      equipo.tiene_sinadef && 'SINADEF',
+      equipo.en_dominio && 'DOMINIO',
+      equipo.tiene_internet && 'INTERNET'
+    ].filter(Boolean).join(', ') || 'Instalación Base';
+
+    win.document.write(`
+      <html>
+        <head>
+          <title>Ficha Técnica de Activo Informático - EsSalud</title>
+          <style>
+            @page { 
+              size: A4; 
+              margin: 0; 
+            }
+            /* Fuente, tamaño y color unificados a nivel global */
+            body { 
+              font-family: 'Arial', sans-serif; 
+              color: #000000; 
+              margin: 0; 
+              padding: 12mm 15mm;
+              font-size: 10px;
+              line-height: 1.3;
+            }
+            .header-layout-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 8px;
+            }
+            .header-layout-table td {
+              border: none !important;
+              padding: 0 !important;
+              vertical-align: middle;
+            }
+            /* Tus márgenes personalizados corregidos */
+            .logo-img {
+              max-height: 150px; 
+              width: auto;
+              display: block;
+              margin-top: -20px; 
+              margin-bottom: -20px; 
+              object-fit: contain;
+            }
+            .header-sub {
+              font-size: 10px; 
+              color: #000000; 
+              text-transform: uppercase;
+              font-weight: bold;
+              margin-top: 2px;
+            }
+            .main-doc-title {
+              text-align: center; 
+              font-size: 11px; 
+              font-weight: bold; 
+              background-color: #d9e1f2; 
+              color: #000000;
+              padding: 6px; 
+              border: 1px solid #cbd5e0;
+              border-radius: 2px;
+              margin-bottom: 12px;
+              text-transform: uppercase;
+            }
+            .unified-table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-bottom: 15px;
+            }
+            .unified-table td { 
+              padding: 5px; 
+              border: 1px solid #cbd5e0; 
+              vertical-align: middle;
+              font-size: 10px;
+              color: #000000;
+            }
+            .section-banner {
+              font-weight: bold;
+              background-color: #d9e1f2; 
+              padding: 5px !important;
+              border: 1px solid #cbd5e0 !important;
+            }
+            .label { 
+              font-weight: bold; 
+              background-color: #f2f2f2; 
+              width: 22%;
+            }
+            .value { 
+              width: 28%;
+            }
+            .perifericos-header-row td {
+              background-color: #f2f2f2;
+              font-weight: bold;
+            }
+            .signatures-container {
+              margin-top: 40px;
+              width: 100%;
+              border-collapse: collapse;
+              page-break-inside: avoid;
+            }
+            .signatures-container td {
+              width: 50%;
+              text-align: center;
+              border: none;
+              padding: 0;
+              font-size: 10px;
+              color: #000000;
+            }
+            .line-signature {
+              width: 100px;
+              border-bottom: 1px solid #000000;
+              margin: 0 auto 6px auto;
+            }
+            .footer-note {
+              margin-top: 25px;
+              font-size: 8.5px;
+              color: #000000;
+              text-align: center;
+              border-top: 1px dashed #cbd5e0;
+              padding-top: 4px;
+            }
+          </style>
+        </head>
+        <body>
+          
+          <table class="header-layout-table">
+            <tr>
+              <td>
+                <img src="${baseUrl}/logo-essalud.png" alt="Logo EsSalud" class="logo-img" />
+                <div class="header-sub">Oficina de Soporte Informático y Telecomunicaciones</div>
+              </td>
+              <td style="text-align: right; font-size: 10px; color: #000000; line-height: 1.3;">
+                <strong>Código de Registro:</strong> #EQ-${id}<br>
+                <strong>Fecha Impresión:</strong> ${fechaImpresion}
+              </td>
+            </tr>
+          </table>
+
+          <div class="main-doc-title">FICHA TÉCNICA Y CONTROL DE ACTIVO INFORMÁTICO</div>
+
+          <table class="unified-table">
+            
+            <tr>
+              <td colspan="4" class="section-banner">I. DATOS DEL USUARIO ASIGNADO / UBICACIÓN</td>
+            </tr>
+            <tr>
+              <td class="label">Responsable:</td>
+              <td class="value" colspan="3">
+                ${equipo.usuarios ? `${equipo.usuarios.apellidos}, ${equipo.usuarios.nombres}` : 'Sin Asignar / Custodia Provisional'}
+              </td>
+            </tr>
+            <tr>
+              <td class="label">Código de Planilla:</td>
+              <td class="value">
+                ${equipo.usuarios?.cod_planilla || 'S/N (Personal Externo)'}
+              </td>
+              <td class="label">Ubicación / Servicio:</td>
+              <td class="value">
+                ${equipo.ubicaciones ? `${equipo.ubicaciones.servicio} — ${equipo.ubicaciones.area}` : 'Almacén / Stock'}
+              </td>
+            </tr>
+
+            <tr>
+              <td colspan="4" class="section-banner">II. ESPECIFICACIONES TÉCNICAS DEL EQUIPO</td>
+            </tr>
+            <tr>
+              <td class="label">Tipo Dispositivo:</td>
+              <td class="value">${equipo.tipo_equipo || 'N/A'}</td>
+              <td class="label">Cód. Patrimonial:</td>
+              <td class="value">${equipo.cod_patrimonio || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td class="label">Marca / Modelo:</td>
+              <td class="value">${equipo.marca || 'N/A'} ${equipo.modelo ? `— ${equipo.modelo}` : ''}</td>
+              <td class="label">Número de Serie:</td>
+              <td class="value">${equipo.numero_serie || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td class="label">Procesador:</td>
+              <td class="value">${equipo.procesador || 'N/A'}</td>
+              <td class="label">Memoria RAM:</td>
+              <td class="value">${equipo.memoria_ram || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td class="label">Almacenamiento:</td>
+              <td class="value">${equipo.almacenamiento || 'N/A'}</td>
+              <td class="label">Hostname:</td>
+              <td class="value">${equipo.nombre_red_pc || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td class="label">Dirección IP:</td>
+              <td class="value">${equipo.direccion_ip || 'DHCP'}</td>
+              <td class="label">Dirección MAC:</td>
+              <td class="value">${equipo.direccion_mac || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td class="label">Sistema Operativo:</td>
+              <td class="value">${equipo.sistema_operativo || 'N/A'}</td>
+              <td class="label">Estado Actual:</td>
+              <td class="value">${equipo.estado || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td class="label">Antivirus Instalado:</td>
+              <td class="value">${equipo.antivirus || 'N/A'}</td>
+              <td class="label">Clave Acceso VNC:</td>
+              <td class="value">${equipo.clave_vnc || 'N/R'}</td>
+            </tr>
+            <tr>
+              <td class="label">Sistemas Autorizados:</td>
+              <td class="value" colspan="3">${sistemasList}</td>
+            </tr>
+            <tr>
+              <td class="label">Fecha Ingreso:</td>
+              <td class="value">${fechaIngreso}</td>
+              <td class="label">Cód. Etiqueta Verde:</td>
+              <td class="value">${equipo.cod_patrimonio_verde || 'Sin Etiqueta'}</td>
+            </tr>
+
+            <tr>
+              <td colspan="4" class="section-banner">III. COMPONENTES PERIFÉRICOS ASIGNADOS</td>
+            </tr>
+            <tr class="perifericos-header-row">
+              <td>Tipo Dispositivo</td>
+              <td>Marca / Modelo</td>
+              <td>Número de Serie</td>
+              <td>Cód. Patrimonio</td>
+            </tr>
+            ${perifericosRows}
+          <script>
+            window.onload = function() { 
+              setTimeout(function() {
+                window.print(); 
+                window.close(); 
+              }, 400);
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    win.document.close();
   };
-
-  // impresión de stickers de inventario
+  // Impresión de stickers de inventario
   const handlePrintQR = () => {
     const printContent = qrRef.current?.innerHTML;
     if (printContent) {
@@ -156,13 +485,6 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="max-w-5xl mx-auto bg-gray-50 min-h-screen py-8 px-4 text-gray-900 animate-fadeIn print:bg-white print:p-0">
-      
-      {/* CABECERA EXCLUSIVA IMPRESIÓN (Solo pdf) */}
-      <div className="hidden print:block border-b-2 border-slate-800 pb-4 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Ficha Técnica de Hardware - MedTrack</h1>
-        <p className="text-xs text-gray-500 mt-1">Generado automáticamente el {new Date().toLocaleDateString()}</p>
-      </div>
-
       {/* CABECERA WEB */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 print:hidden">
         <div>
@@ -189,10 +511,10 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
         
         {/* GRUPO DE BOTONES */}
         <div className="flex flex-wrap gap-2 shrink-0 w-full md:w-auto">
-          <button onClick={exportarAExcel} className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-emerald-700 rounded-xl text-sm font-semibold hover:bg-emerald-50 transition shadow-xs">
+          <button onClick={exportarAExcel} className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-emerald-700 rounded-xl text-sm font-semibold hover:bg-emerald-50 transition shadow-xs cursor-pointer">
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> <span className="hidden sm:inline">Excel</span>
           </button>
-          <button onClick={exportarAPDF} className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 transition shadow-xs">
+          <button onClick={exportarAPDF} className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 transition shadow-xs cursor-pointer">
             <FileDown className="w-4 h-4 text-slate-600" /> <span className="hidden sm:inline">Ficha PDF</span>
           </button>
           <Link href="/equipos" className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition shadow-xs">
@@ -209,7 +531,7 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
         {/* COLUMNA IZQUIERDA: DATOS Y HARDWARE */}
         <div className="lg:col-span-2 space-y-6">
           
-          {/* TARJETA: DATOS GENERALES (FECHA DE REGISTRO AÑADIDA AQUÍ) */}
+          {/* TARJETA: DATOS GENERALES */}
           <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs print:shadow-none print:border-gray-300">
             <h3 className="text-base font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2 print:border-gray-300">
               <FileText className="w-5 h-5 text-blue-500 print:hidden" /> Información General
@@ -219,7 +541,7 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
               <div><p className="text-gray-400 text-xs font-semibold uppercase print:text-gray-600">Marca / Modelo</p><p className="font-bold text-gray-700 mt-0.5">{equipo.marca || 'N/A'} {equipo.modelo ? `- ${equipo.modelo}` : ''}</p></div>
               <div><p className="text-gray-400 text-xs font-semibold uppercase print:text-gray-600">Número de Serie</p><p className="font-mono font-medium text-gray-600 mt-0.5">{equipo.numero_serie || 'N/A'}</p></div>
               
-              {/*FECHA DE REGISTRO */}
+              {/* FECHA DE REGISTRO */}
               <div>
                 <p className="text-gray-400 text-xs font-semibold uppercase print:text-gray-600">Fecha de Ingreso al Sistema</p>
                 <p className="font-bold text-indigo-700 mt-0.5">
@@ -287,7 +609,7 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
         {/* COLUMNA DERECHA: GENERACIÓN DE QR + HISTORIAL */}
         <div className="lg:col-span-1 space-y-6">
           
-          {/* TARJETA DE USUARIO  */}
+          {/* TARJETA DE USUARIO */}
           <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs print:shadow-none print:border-gray-300">
             <h3 className="text-base font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2 print:border-gray-300">
               <User className="w-5 h-5 text-teal-500 print:hidden" /> Usuario Asignado
@@ -327,7 +649,7 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
               Escanea con cualquier smartphone corporativo para acceder directo a la ficha técnica física en tiempo real.
             </p>
 
-            {/* imprimir boton */}
+            {/* Imprimir sticker */}
             <button onClick={handlePrintQR} className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-xs print:hidden">
               <Printer className="w-3.5 h-3.5" /> Imprimir Etiqueta (Sticker)
             </button>

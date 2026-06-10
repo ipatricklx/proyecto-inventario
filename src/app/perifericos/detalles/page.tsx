@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { 
   ArrowLeft, 
   Edit, 
@@ -62,52 +62,327 @@ export default function DetallePerifericoPage() {
     setLoading(false);
   }
 
-  // ==========================================
-  // 🔥 FORMATO DE FECHA ESTILO "EQUIPOS"
-  // Evita el salto de zona horaria (resta de 1 día)
-  // ==========================================
+  
   const formatearFecha = (fecha: string) => {
     if (!fecha) return 'N/A';
     try {
-      // Supabase devuelve algo como "2024-10-15T14:30:00Z"
-      // Cortamos por la "T" y nos quedamos con "2024-10-15"
       const soloFecha = fecha.split('T')[0]; 
       const [year, month, day] = soloFecha.split('-');
       return `${day}/${month}/${year}`;
     } catch (error) {
-      return fecha; // Si falla, devuelve la fecha tal cual
+      return fecha;
+    }
+  };
+
+  const formatearFechaLarga = (fecha: string) => {
+    if (!fecha) return 'No registrada';
+    try {
+      return new Date(fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+    } catch (error) {
+      return 'No registrada';
     }
   };
 
   // ==========================================
   // 🔥 ACCIÓN: EXPORTAR A EXCEL
   // ==========================================
-  const exportarAExcel = () => {
+ // ==========================================
+  // 🔥 ACCIÓN: EXPORTAR A EXCEL (ESTILO EQUIPOS)
+  // ==========================================
+  const exportarAExcel = async () => {
     if (!periferico) return;
-    const libro = XLSX.utils.book_new();
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Ficha Periférico');
 
-    const datosPeriferico = [
-      { 'Categoría': 'GENERAL', 'Propiedad': 'Tipo de Componente', 'Valor': periferico.tipo_periferico },
-      { 'Categoría': 'GENERAL', 'Propiedad': 'Marca y Modelo', 'Valor': `${periferico.marca || 'N/A'} ${periferico.modelo ? `- ${periferico.modelo}` : ''}` },
-      { 'Categoría': 'GENERAL', 'Propiedad': 'Número de Serie', 'Valor': periferico.n_serie || periferico.numero_serie || 'N/A' },
-      { 'Categoría': 'GENERAL', 'Propiedad': 'Fecha de Registro', 'Valor': formatearFecha(periferico.created_at) },
-      { 'Categoría': 'INVENTARIO', 'Propiedad': 'Cód. Etiqueta Azul (SBN)', 'Valor': periferico.cod_patrimonio_azul || periferico.cod_patrimonio || 'N/A' },
-      { 'Categoría': 'INVENTARIO', 'Propiedad': 'Cód. Etiqueta Verde', 'Valor': periferico.cod_patrimonio_verde || 'N/A' },
-      { 'Categoría': 'ESTADO', 'Propiedad': 'Estado Técnico', 'Valor': periferico.estado || periferico.estado_fisico || 'OPERATIVO' },
-      { 'Categoría': 'HARDWARE', 'Propiedad': 'Especificaciones Técnicas', 'Valor': periferico.detalle_tecnico || 'Sin detalles registrados' },
-      { 'Categoría': 'ASIGNACIÓN', 'Propiedad': 'Computadora Vinculada', 'Valor': periferico.equipos ? periferico.equipos.nombre_red_pc : 'Almacén / Stock Libre' },
-      { 'Categoría': 'LOGÍSTICA', 'Propiedad': 'Observaciones', 'Valor': periferico.observaciones_almacen || 'Sin observaciones' },
+    worksheet.views = [{ showGridLines: true }];
+
+    // Título Principal
+    worksheet.mergeCells('A1:E1');
+    const titleCell = worksheet.getCell('A1');
+    titleCell.value = 'FICHA TÉCNICA Y CONTROL DE COMPONENTE PERIFÉRICO';
+    titleCell.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '0070C0' } }; // Azul Institucional
+    titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    worksheet.getRow(1).height = 30;
+
+    // Sección I: Identificación General
+    worksheet.mergeCells('A3:E3');
+    const secGen = worksheet.getCell('A3');
+    secGen.value = 'I. DATOS DE IDENTIFICACIÓN GENERAL';
+    secGen.font = { bold: true }; 
+    secGen.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'D9E1F2' } }; // Celeste claro
+
+    const genData = [
+      ['Tipo Componente:', periferico.tipo_periferico || 'N/A', '', 'Estado Técnico:', periferico.estado || periferico.estado_fisico || 'OPERATIVO'],
+      ['Marca / Modelo:', `${periferico.marca || 'N/A'} ${periferico.modelo ? `- ${periferico.modelo}` : ''}`, '', 'Número de Serie:', periferico.n_serie || periferico.numero_serie || 'N/A']
     ];
-    
-    const hoja = XLSX.utils.json_to_sheet(datosPeriferico);
-    XLSX.utils.book_append_sheet(libro, hoja, 'Ficha Periférico');
 
-    XLSX.writeFile(libro, `Ficha_Periferico_${periferico.cod_patrimonio_azul || periferico.cod_patrimonio || id}.xlsx`);
+    genData.forEach((row, idx) => {
+      worksheet.getCell(`A${4 + idx}`).value = row[0];
+      worksheet.getCell(`B${4 + idx}`).value = row[1];
+      worksheet.getCell(`D${4 + idx}`).value = row[3];
+      worksheet.getCell(`E${4 + idx}`).value = row[4];
+      worksheet.getCell(`A${4 + idx}`).font = { bold: true };
+      worksheet.getCell(`D${4 + idx}`).font = { bold: true };
+    });
+
+    // Sección II: Especificaciones y Logística
+    worksheet.mergeCells('A7:E7');
+    const secLog = worksheet.getCell('A7');
+    secLog.value = 'II. ESPECIFICACIONES TÉCNICAS Y LOGÍSTICA';
+    secLog.font = { bold: true }; 
+    secLog.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'D9E1F2' } };
+
+    const logData = [
+      ['Cód. Patrimonio SBN:', periferico.cod_patrimonio_azul || periferico.cod_patrimonio || 'N/A', '', 'Cód. Etiqueta Verde:', periferico.cod_patrimonio_verde || 'Sin Etiqueta'],
+      ['Fecha Ingreso:', formatearFechaLarga(periferico.created_at), '', 'Detalles Hardware:', periferico.detalle_tecnico || 'Sin especificaciones']
+    ];
+
+    logData.forEach((row, idx) => {
+      worksheet.getCell(`A${8 + idx}`).value = row[0];
+      worksheet.getCell(`B${8 + idx}`).value = row[1];
+      worksheet.getCell(`D${8 + idx}`).value = row[3];
+      worksheet.getCell(`E${8 + idx}`).value = row[4];
+      worksheet.getCell(`A${8 + idx}`).font = { bold: true };
+      worksheet.getCell(`D${8 + idx}`).font = { bold: true };
+    });
+
+    // Fila extra para Observaciones (ocupando todo el ancho para que quepa el texto)
+    worksheet.getCell('A10').value = 'Observaciones:';
+    worksheet.getCell('A10').font = { bold: true };
+    worksheet.getCell('B10').value = periferico.observaciones_almacen || 'Sin observaciones logísticas registradas.';
+    worksheet.mergeCells('B10:E10'); // Combinamos para que el texto largo no se corte
+
+    // Sección III: Asignación y Vinculación
+    worksheet.mergeCells('A12:E12');
+    const secAsig = worksheet.getCell('A12');
+    secAsig.value = 'III. ASIGNACIÓN Y VINCULACIÓN EN RED';
+    secAsig.font = { bold: true }; 
+    secAsig.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'D9E1F2' } };
+
+    worksheet.getCell('A13').value = 'Computadora Destino:';
+    worksheet.getCell('A13').font = { bold: true };
+    worksheet.getCell('B13').value = periferico.equipos ? `Vinculado al Hostname: ${periferico.equipos.nombre_red_pc}` : 'No asignado — En Almacén / Stock Libre';
+    worksheet.mergeCells('B13:E13');
+
+    // Ancho de columnas adaptado exactamente igual al de Equipos
+    worksheet.getColumn('A').width = 22;
+    worksheet.getColumn('B').width = 25;
+    worksheet.getColumn('C').width = 5;  // Columna C como espaciador visual
+    worksheet.getColumn('D').width = 20;
+    worksheet.getColumn('E').width = 25;
+
+    // Generar archivo
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Ficha_Periferico_#PER-${id}.xlsx`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
-  //  EXPORTAR A PDF
+  // ==========================================
+  // 🔥 ACCIÓN: EXPORTAR A PDF (TABLA ÚNICA COMPACTA)
+  // ==========================================
   const exportarAPDF = () => {
-    window.print();
+    if (!periferico) return;
+
+    const win = window.open('', '', 'height=900,width=750');
+    if (!win) return;
+
+    const fechaImpresion = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const fechaIngreso = formatearFechaLarga(periferico.created_at);
+    const baseUrl = window.location.origin;
+
+    win.document.write(`
+      <html>
+        <head>
+          <title>Ficha Técnica de Periférico - EsSalud</title>
+          <style>
+            @page { 
+              size: A4; 
+              margin: 0; 
+            }
+            body { 
+              font-family: 'Arial', sans-serif; 
+              color: #000000; 
+              margin: 0; 
+              padding: 12mm 15mm;
+              font-size: 10px;
+              line-height: 1.3;
+            }
+            .header-layout-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 8px;
+            }
+            .header-layout-table td {
+              border: none !important;
+              padding: 0 !important;
+              vertical-align: middle;
+            }
+            .logo-img {
+              max-height: 150px; 
+              width: auto;
+              display: block;
+              margin-top: -20px; 
+              margin-bottom: -20px; 
+              object-fit: contain;
+            }
+            .header-sub {
+              font-size: 10px; 
+              color: #000000; 
+              text-transform: uppercase;
+              font-weight: bold;
+              margin-top: 2px;
+            }
+            .main-doc-title {
+              text-align: center; 
+              font-size: 11px; 
+              font-weight: bold; 
+              background-color: #d9e1f2; 
+              color: #000000;
+              padding: 6px; 
+              border: 1px solid #cbd5e0;
+              border-radius: 2px;
+              margin-bottom: 12px;
+              text-transform: uppercase;
+            }
+            .unified-table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-bottom: 15px;
+            }
+            .unified-table td { 
+              padding: 5px; 
+              border: 1px solid #cbd5e0; 
+              vertical-align: middle;
+              font-size: 10px;
+              color: #000000;
+            }
+            .section-banner {
+              font-weight: bold;
+              background-color: #d9e1f2; 
+              padding: 5px !important;
+              border: 1px solid #cbd5e0 !important;
+            }
+            .label { 
+              font-weight: bold; 
+              background-color: #f2f2f2; 
+              width: 22%;
+            }
+            .value { 
+              width: 28%;
+            }
+            .signatures-container {
+              margin-top: 40px;
+              width: 100%;
+              border-collapse: collapse;
+              page-break-inside: avoid;
+            }
+            .signatures-container td {
+              width: 50%;
+              text-align: center;
+              border: none;
+              padding: 0;
+              font-size: 10px;
+              color: #000000;
+            }
+            .line-signature {
+              width: 180px;
+              border-bottom: 1px solid #000000;
+              margin: 0 auto 6px auto;
+            }
+            .footer-note {
+              margin-top: 25px;
+              font-size: 8.5px;
+              color: #000000;
+              text-align: center;
+              border-top: 1px dashed #cbd5e0;
+              padding-top: 4px;
+            }
+          </style>
+        </head>
+        <body>
+          
+          <table class="header-layout-table">
+            <tr>
+              <td>
+                <img src="${baseUrl}/logo-essalud.png" alt="Logo EsSalud" class="logo-img" />
+                <div class="header-sub">Oficina de Soporte Informático y Telecomunicaciones</div>
+              </td>
+              <td style="text-align: right; font-size: 10px; color: #000000; line-height: 1.3;">
+                <strong>Código de Registro:</strong> #PER-${id}<br>
+                <strong>Fecha Impresión:</strong> ${fechaImpresion}
+              </td>
+            </tr>
+          </table>
+
+          <div class="main-doc-title">FICHA TÉCNICA Y CONTROL DE COMPONENTE PERIFÉRICO</div>
+
+          <table class="unified-table">
+            
+            <tr>
+              <td colspan="4" class="section-banner">I. DATOS DE IDENTIFICACIÓN GENERAL</td>
+            </tr>
+            <tr>
+              <td class="label">Tipo Componente:</td>
+              <td class="value" style="font-weight: bold;">${periferico.tipo_periferico || 'N/A'}</td>
+              <td class="label">Estado Técnico:</td>
+              <td class="value">${periferico.estado || periferico.estado_fisico || 'OPERATIVO'}</td>
+            </tr>
+            <tr>
+              <td class="label">Marca / Modelo:</td>
+              <td class="value">${periferico.marca || 'N/A'} ${periferico.modelo ? `— ${periferico.modelo}` : ''}</td>
+              <td class="label">Número de Serie:</td>
+              <td class="value">${periferico.n_serie || periferico.numero_serie || 'N/A'}</td>
+            </tr>
+
+            <tr>
+              <td colspan="4" class="section-banner">II. ESPECIFICACIONES TÉCNICAS Y LOGÍSTICA</td>
+            </tr>
+            <tr>
+              <td class="label">Cód. Patrimonio SBN:</td>
+              <td class="value">${periferico.cod_patrimonio_azul || periferico.cod_patrimonio || 'N/A'}</td>
+              <td class="label">Cód. Etiqueta Verde:</td>
+              <td class="value">${periferico.cod_patrimonio_verde || 'Sin Etiqueta'}</td>
+            </tr>
+            <tr>
+              <td class="label">Fecha Ingreso:</td>
+              <td class="value" colspan="3">${fechaIngreso}</td>
+            </tr>
+            <tr>
+              <td class="label">Detalles de Hardware:</td>
+              <td class="value" colspan="3">${periferico.detalle_tecnico || 'Sin especificaciones técnicas adicionales.'}</td>
+            </tr>
+            <tr>
+              <td class="label">Observaciones:</td>
+              <td class="value" colspan="3">${periferico.observaciones_almacen || 'Sin observaciones logísticas registradas.'}</td>
+            </tr>
+
+            <tr>
+              <td colspan="4" class="section-banner">III. ASIGNACIÓN Y VINCULACIÓN EN RED</td>
+            </tr>
+            <tr>
+              <td class="label">Computadora Destino:</td>
+              <td class="value" colspan="3">
+                ${periferico.equipos ? `Vinculado al Hostname: ${periferico.equipos.nombre_red_pc}` : 'No asignado — En Almacén / Stock Libre'}
+              </td>
+            </tr>
+          <script>
+            window.onload = function() { 
+              setTimeout(function() {
+                window.print(); 
+                window.close(); 
+              }, 400);
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    win.document.close();
   };
 
   // Función nativa optimizada para impresión de stickers de inventario
@@ -158,7 +433,7 @@ export default function DetallePerifericoPage() {
   return (
     <div className="max-w-5xl mx-auto bg-gray-50 min-h-screen py-8 px-4 text-gray-900 animate-fadeIn print:bg-white print:p-0">
       
-      {/* CABECERA EXCLUSIVA IMPRESIÓN (Visible solo en PDF) */}
+      {/* CABECERA EXCLUSIVA IMPRESIÓN (Visible solo en PDF directo del navegador) */}
       <div className="hidden print:block border-b-2 border-slate-800 pb-4 mb-6">
         <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Ficha Técnica de Periférico</h1>
         <p className="text-xs text-gray-500 mt-1">Generado automáticamente el {new Date().toLocaleDateString()}</p>
@@ -242,13 +517,10 @@ export default function DetallePerifericoPage() {
                 </p>
               </div>
 
-              {/* CAMPO DE FECHA ACTUALIZADO */}
                <div>
                 <p className="text-gray-400 text-xs font-semibold uppercase print:text-gray-600">Fecha de Ingreso al Sistema</p>
                 <p className="font-bold text-indigo-700 mt-0.5">
-                  {periferico.created_at 
-                    ? new Date(periferico.created_at).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric'})
-                    : 'No registrada'}
+                  {formatearFechaLarga(periferico.created_at)}
                 </p>
               </div>
 
