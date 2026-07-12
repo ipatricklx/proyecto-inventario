@@ -84,10 +84,10 @@ export default function DetallePerifericoPage() {
   };
 
   // ==========================================
-  // 🔥 ACCIÓN: EXPORTAR A EXCEL
+  // EXPORTAR A EXCEL
   // ==========================================
  // ==========================================
-  // 🔥 ACCIÓN: EXPORTAR A EXCEL (ESTILO EQUIPOS)
+  // EXPORTAR A EXCEL (ESTILO EQUIPOS)
   // ==========================================
   const exportarAExcel = async () => {
     if (!periferico) return;
@@ -184,7 +184,7 @@ export default function DetallePerifericoPage() {
   };
 
   // ==========================================
-  // 🔥 ACCIÓN: EXPORTAR A PDF (TABLA ÚNICA COMPACTA)
+  // EXPORTAR A PDF
   // ==========================================
   const exportarAPDF = () => {
     if (!periferico) return;

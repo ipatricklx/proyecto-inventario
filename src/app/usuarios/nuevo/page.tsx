@@ -34,7 +34,6 @@ export default function NuevoUsuarioPage() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Apellidos y nombres los forzamos a mayúsculas para mantener orden, el resto normal
     const val = (e.target.name === 'apellidos' || e.target.name === 'nombres') 
                 ? e.target.value.toUpperCase() 
                 : e.target.value;

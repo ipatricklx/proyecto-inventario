@@ -1,7 +1,7 @@
 'use client';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-import useSWR from 'swr'; // 🌟 1. Importamos SWR
+import useSWR from 'swr'; 
 import { 
   RefreshCw, 
   Monitor, 
@@ -15,7 +15,7 @@ import {
   Plus
 } from 'lucide-react';
 
-// 🌟 2. INTERFAZ PARA LAS MÉTRICAS
+// INTERFAZ
 interface DashboardMetrics {
   totalEquipos: number;
   totalPerifericos: number;
@@ -28,7 +28,6 @@ interface DashboardMetrics {
   perifericosObsoletos: number;
 }
 
-// 🌟 3. FETCHER PARA SWR (Maneja todas las promesas)
 const fetchDashboardMetrics = async (): Promise<DashboardMetrics> => {
   const [
     { count: equiposCount },
@@ -71,13 +70,13 @@ const fetchDashboardMetrics = async (): Promise<DashboardMetrics> => {
 };
 
 export default function DashboardPage() {
-  // 🌟 4. USO DE SWR (Adiós useState y useEffect)
+
   const { data: metrics, error, isLoading, mutate } = useSWR<DashboardMetrics>(
     'dashboard-metrics', 
     fetchDashboardMetrics,
     {
-      revalidateOnFocus: true, // Refresca los datos automáticamente si el usuario cambia de pestaña y vuelve
-      dedupingInterval: 10000, // Evita peticiones duplicadas en un rango de 10 segundos
+      revalidateOnFocus: true, 
+      dedupingInterval: 10000, 
     }
   );
 
@@ -90,13 +89,11 @@ export default function DashboardPage() {
     return <div className="text-center py-20 text-red-500 font-medium">Error al cargar métricas: {error.message}</div>;
   }
 
-  // Valores por defecto seguros por si algo falla en la hidratación
   const safeMetrics = metrics || {
     totalEquipos: 0, totalPerifericos: 0, totalUsuarios: 0, pcsEnUso: 0,
     equiposGarantia: 0, equiposObsoletos: 0, equiposBaja: 0, perifericosGarantia: 0, perifericosObsoletos: 0
   };
 
-  // Calcular la flota operativa real
   const equiposOperativosReales = safeMetrics.totalEquipos - safeMetrics.equiposBaja;
   
   // La tasa divide las PCs asignadas útiles entre la flota operativa útil

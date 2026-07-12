@@ -1,10 +1,4 @@
 import ExcelJS from 'exceljs';
-
-/**
- * Lee un archivo Excel subido por el usuario y lo convierte en un array de objetos.
- * @param file El archivo capturado desde el input
- * @param expectedHeaders Las cabeceras exactas que esperamos en la fila 1 para validar el archivo
- */
 export const importFromExcel = async (file: File, expectedHeaders: string[]): Promise<any[]> => {
   try {
     const buffer = await file.arrayBuffer();

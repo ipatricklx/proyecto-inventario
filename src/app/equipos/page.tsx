@@ -3,11 +3,11 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import useSWR from 'swr';
-// 🌟 Importamos los utilitarios de Excel
+// Importamos los utilitarios de Excel
 import { exportToExcel, downloadExcelTemplate } from '@/utils/excelExport';
 import { importFromExcel } from '@/utils/excelImport';
 
-// 🌟 1. INTERFACES
+// 1. INTERFACES
 interface Ubicacion {
   servicio: string;
   area: string;
@@ -25,7 +25,7 @@ interface Equipo {
   ubicaciones: Ubicacion | null;
 }
 
-// 🌟 2. HOOK DE DEBOUNCE
+//  2. HOOK DE DEBOUNCE
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
   useEffect(() => {
@@ -73,7 +73,7 @@ export default function EquiposPage() {
   const [paginaActual, setPaginaActual] = useState(1);
   const ITEMS_POR_PAGINA = 10;
 
-  // 🌟 Estados para Excel
+  // Estados para Excel
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -93,7 +93,7 @@ export default function EquiposPage() {
   const totalEquipos = data?.total || 0;
   const totalPaginas = Math.ceil(totalEquipos / ITEMS_POR_PAGINA);
 
-  // 🌟 5. FUNCIONES DE EXCEL
+  // FUNCIONES DE EXCEL
   const handleDescargarPlantilla = async () => {
     try {
       // Ponemos TODOS los campos que mencionaste para una carga masiva super completa
@@ -218,22 +218,43 @@ export default function EquiposPage() {
     }
   };
 
-  // 🌟 6. MUTATE PARA ELIMINAR SIN RECARGAR
+  // 
   const handleDelete = async (id_equipo: number, cod_patrimonio: string) => {
-    const confirmacion = window.confirm(`¿Estás seguro de enviar a la papelera el equipo patrimonial ${cod_patrimonio || 'sin código'}?`);
+    const confirmacion = window.confirm(`¿Estás seguro de enviar a la papelera el equipo patrimonial ${cod_patrimonio || 'sin código'} y darlo de BAJA?`);
     if (!confirmacion) return;
 
-    const { error } = await supabase
+    const fechaActual = new Date().toISOString();
+
+    // 1. Actualizamos el equipo: Lo mandamos a la papelera Y cambiamos su estado a BAJA
+    const { error: errorEquipo } = await supabase
       .from('equipos')
-      .update({ deleted_at: new Date().toISOString() })
+      .update({ 
+        deleted_at: fechaActual,
+        estado: 'BAJA' 
+      })
       .eq('id_equipo', id_equipo);
     
-    if (error) {
-      alert('Error al enviar a la papelera: ' + error.message);
+    if (errorEquipo) {
+      alert('Error al enviar a la papelera: ' + errorEquipo.message);
       return;
     }
+
+    // 2. Registramos el movimiento en el historial (estados_equipo)
+    const { error: errorHistorial } = await supabase
+      .from('estados_equipo')
+      .insert([{
+        id_equipo: id_equipo, 
+        tipo_estado: 'BAJA',
+        motivo: 'Equipo dado de baja y enviado a la papelera.',
+        fecha: fechaActual
+      }]);
+
+    if (errorHistorial) {
+      console.error('Error al guardar en el historial:', errorHistorial.message);
+      // No bloqueamos el proceso si falla el historial, pero lo registramos en consola
+    }
     
-    mutate();
+    mutate(); // Recarga la tabla
   };
 
   const getColorEstado = (estado: string) => {

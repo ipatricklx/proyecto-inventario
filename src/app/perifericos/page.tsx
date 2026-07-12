@@ -3,11 +3,10 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import useSWR from 'swr';
-// 🌟 Importamos los mismos utilitarios universales de Excel
 import { exportToExcel, downloadExcelTemplate } from '@/utils/excelExport';
 import { importFromExcel } from '@/utils/excelImport';
 
-// 🌟 1. INTERFACES PARA TYPESCRIPT
+// INTERFACES
 interface EquipoVinculado {
   nombre_red_pc: string | null;
 }
@@ -87,8 +86,6 @@ export default function PerifericosPage() {
   useEffect(() => {
     setPaginaActual(1);
   }, [debouncedSearch, filtroTipo, filtroEstado]);
-
-  // 🌟 4. LA MAGIA DE SWR
   const { data, error, isLoading, mutate } = useSWR(
     ['perifericos', debouncedSearch, filtroTipo, filtroEstado, paginaActual],
     fetchPerifericos,
@@ -99,7 +96,7 @@ export default function PerifericosPage() {
   const totalPerifericos = data?.total || 0;
   const totalPaginas = Math.ceil(totalPerifericos / ITEMS_POR_PAGINA);
 
-  // 🌟 5. ACCIONES EXCEL PARA PERIFÉRICOS
+  //  ACCIONES EXCEL PARA PERIFÉRICOS
   const handleDescargarPlantilla = async () => {
     try {
       const columnasPlantilla = [
@@ -169,7 +166,6 @@ export default function PerifericosPage() {
       const { data, error: fetchError } = await query.order('tipo_periferico', { ascending: true });
       if (fetchError) throw fetchError;
 
-      // Estructuramos la información agregando el tipado exacto (eq: any) para evitar errores de compilación
       const dataMapeada = (data || []).map((eq: any) => ({
         ...eq,
         serie_final: eq.n_serie || eq.numero_serie || '-',
@@ -198,19 +194,40 @@ export default function PerifericosPage() {
     }
   };
 
-  // 🌟 6. MUTATE PARA ELIMINAR SIN RECARGAR
+  // 
+  // 🌟 6. MUTATE PARA ELIMINAR Y DAR DE BAJA
   const handleEliminar = async (id: number, tipo: string, marca: string) => {
-    const confirmacion = window.confirm(`¿Estás seguro de enviar a la papelera el periférico: ${tipo} ${marca}?`);
+    const confirmacion = window.confirm(`¿Estás seguro de enviar a la papelera el periférico: ${tipo} ${marca} y darlo de BAJA?`);
     if (!confirmacion) return;
 
-    const { error } = await supabase
+    const fechaActual = new Date().toISOString();
+
+    // 1. Mandar a la papelera y cambiar el estado físico a BAJA
+    const { error: errorPeriferico } = await supabase
       .from('perifericos')
-      .update({ deleted_at: new Date().toISOString() }) 
+      .update({ 
+        deleted_at: fechaActual,
+        estado_fisico: 'BAJA' 
+      }) 
       .eq('id_periferico', id);
       
-    if (error) { 
-      alert('Error: ' + error.message); 
+    if (errorPeriferico) { 
+      alert('Error al eliminar: ' + errorPeriferico.message); 
       return; 
+    }
+
+    // 2. Insertar en el historial de estados de periféricos
+    const { error: errorHistorial } = await supabase
+      .from('estados_perifericos')
+      .insert([{
+        id_periferico: id,
+        tipo_estado: 'BAJA',
+        motivo: 'Periférico dado de baja y enviado a la papelera.',
+        fecha: fechaActual
+      }]);
+
+    if (errorHistorial) {
+      console.error('Error al guardar el historial del periférico:', errorHistorial.message);
     }
     
     mutate();

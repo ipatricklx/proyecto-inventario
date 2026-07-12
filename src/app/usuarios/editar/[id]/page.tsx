@@ -3,7 +3,6 @@ import { useState, useEffect, use } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-// Importamos los iconos profesionales de Lucide
 import { 
   ArrowLeft, 
   Save, 
@@ -90,7 +89,6 @@ export default function EditarUsuarioPage({ params }: { params: Promise<{ id: st
     return <div className="text-center py-20 text-slate-500 font-medium animate-pulse">Cargando datos del personal...</div>;
   }
 
-  // Estilos globales reutilizables para los campos de texto
   const inputStyles = "block w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-800 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 focus:bg-white transition-all duration-200";
 
   return (

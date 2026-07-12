@@ -17,46 +17,6 @@ import {
   Menu
 } from 'lucide-react';
 
-// ==========================================
-// COMPONENTE: LOGO DE CAJA ANIMADA
-// ==========================================
-const LogoCajaAnimada = ({ sidebarOpen }: { sidebarOpen: boolean }) => (
-  <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-white/10 shadow-lg group cursor-pointer flex-shrink-0">
-    {/* Efecto de brillo de fondo */}
-    <div className="absolute inset-0 bg-[#009BDE] rounded-xl opacity-0 group-hover:opacity-20 transition-opacity duration-500 blur-sm"></div>
-    
-    {/* SVG de la Caja */}
-    <svg 
-      xmlns="http://www.w3.org/2000/svg" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="1.5" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      // Efecto flotante constante en toda la caja
-      className={`text-[#009BDE] transition-all duration-300 animate-[bounce_3s_infinite] ${sidebarOpen ? 'w-6 h-6' : 'w-5 h-5'}`}
-    >
-      {/* Base de la caja */}
-      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      <line x1="3.27" y1="6.96" x2="12" y2="12.01" />
-      <line x1="12" y1="22.08" x2="12" y2="12" />
-      
-      {/* Tapa derecha de la caja (Se levanta al hacer hover en el contenedor padre 'group') */}
-      <line 
-        x1="20.73" y1="6.96" 
-        x2="12" y2="12.01" 
-        className="origin-bottom transition-transform duration-500 ease-in-out group-hover:-translate-y-1.5 group-hover:-rotate-6"
-      />
-      {/* Elemento saliendo de la caja (Aparece suavemente en hover) */}
-      <path 
-        d="M12 12v-6m0 0l-2 2m2-2l2 2" 
-        className="opacity-0 group-hover:opacity-100 transition-all duration-500 group-hover:-translate-y-2 text-white" 
-      />
-    </svg>
-  </div>
-);
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -99,7 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es">
       <body className="flex h-screen bg-[#F4F7FA] overflow-hidden font-sans antialiased text-gray-900 print:h-auto print:overflow-visible print:bg-white">
         
-        {/* SIDEBAR CON COLORES DE ESSALUD (#002B49) */}
+        {/* SIDEBAR */}
         <aside 
           className={`bg-[#002B49] text-slate-300 flex flex-col transition-all duration-300 ease-in-out z-20 shadow-2xl relative print:hidden ${
             sidebarOpen ? 'w-64' : 'w-20'
@@ -107,7 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           <div className="h-16 flex items-center justify-center border-b border-white/10 transition-colors mt-2 mb-2">
             <div className="flex items-center gap-3">
-              {/* Logo Personalizado con tu GIF (Sin bordes ni fondos) */}
+              {/* Logo Personalizado */}
             <div className="relative flex items-center justify-center w-10 h-10 flex-shrink-0">
               <Image 
                 src="/logo_animado_icono.gif" 
@@ -143,8 +103,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   key={item.name}
                   href={item.path} 
                   className={`flex items-center space-x-3 p-3 rounded-xl font-medium transition-all duration-200 group relative ${
-                    // Activo: Fondo celeste transparente y texto celeste brillante
-                    // Inactivo: Hover blanco tenue
                     active 
                       ? 'bg-[#009BDE]/15 text-[#009BDE]' 
                       : 'text-slate-400 hover:bg-white/5 hover:text-white'
@@ -191,7 +149,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             
             <div className="flex items-center">
                <div className="w-8 h-8 rounded-full bg-[#009BDE]/10 flex items-center justify-center text-[#002B49] font-bold text-xs border border-[#009BDE]/20 shadow-sm">
-                 AD {/* Puedes cambiar esto por las iniciales del usuario luego */}
+                 AD {/* */}
                </div>
             </div>
           </header>

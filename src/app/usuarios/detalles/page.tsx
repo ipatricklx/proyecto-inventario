@@ -68,7 +68,7 @@ export default function DetalleUsuarioPage() {
     setLoading(false);
   }
 
-  // Helper para formatear la fecha de forma segura
+  // Helper para formatear fecha
   const formatearFecha = (fechaString: string) => {
     if (!fechaString) return 'S/F';
     const fecha = new Date(fechaString);

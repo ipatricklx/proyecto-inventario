@@ -89,19 +89,41 @@ export default function PapeleraEquiposPage() {
   };
 
   const handleRestaurar = async (id: number, patrimonio: string) => {
-    const confirmacion = window.confirm(`¿Deseas restaurar el equipo ${patrimonio || 'sin patrimonio'} al inventario activo?`);
+    const confirmacion = window.confirm(`¿Deseas restaurar el equipo ${patrimonio || 'sin patrimonio'} al inventario activo y marcarlo como OPERATIVO?`);
     if (!confirmacion) return;
 
-    const { error } = await supabase
+    const fechaActual = new Date().toISOString();
+
+    // 1. Restaurar el equipo y cambiar su estado
+    const { error: errorRestauracion } = await supabase
       .from('equipos')
-      .update({ deleted_at: null })
+      .update({ 
+        deleted_at: null, // Lo sacamos de la papelera
+        estado: 'OPERATIVO' // Le devolvemos el estado activo
+      })
       .eq('id_equipo', id);
 
-    if (error) {
-      alert('Error al restaurar: ' + error.message);
-    } else {
-      cargarEliminados();
+    if (errorRestauracion) {
+      alert('Error al restaurar: ' + errorRestauracion.message);
+      return;
     }
+
+    // 2. Guardar el movimiento en el historial
+    const { error: errorHistorial } = await supabase
+      .from('estados_equipo')
+      .insert([{
+        id_equipo: id,
+        tipo_estado: 'OPERATIVO',
+        motivo: 'Restaurado desde la papelera de reciclaje.',
+        fecha: fechaActual
+      }]);
+
+    if (errorHistorial) {
+      console.error('Error al guardar el historial de restauración:', errorHistorial.message);
+    }
+    
+    // Recargar la lista para que desaparezca de la pantalla actual
+    cargarEliminados();
   };
 
   const handleBorrarDefinitivo = async (id: number, patrimonio: string) => {

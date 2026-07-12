@@ -39,14 +39,9 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { session } } = await supabase.auth.getSession()
-
-  // REGLA DE PROTECCIÓN:
-  // Si no hay sesión y no estás en el login, para fuera (al login)
   if (!session && !request.nextUrl.pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
-
-  // Si ya hay sesión e intentas ir al login, te mando al inicio
   if (session && request.nextUrl.pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/', request.url))
   }

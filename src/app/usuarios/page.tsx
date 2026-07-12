@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import useSWR from 'swr';
-// 🌟 Importamos los utilitarios universales de Excel
 import { exportToExcel, downloadExcelTemplate } from '@/utils/excelExport';
 import { importFromExcel } from '@/utils/excelImport';
 
@@ -28,8 +27,6 @@ function useDebounce<T>(value: T, delay: number): T {
   }, [value, delay]);
   return debouncedValue;
 }
-
-// 🌟 EL FETCHER DE SUPABASE
 const fetchUsuarios = async ([key, search, inactivos, paginaActual]: [string, string, boolean, number]) => {
   const ITEMS_POR_PAGINA = 10;
   
@@ -71,7 +68,7 @@ export default function UsuariosPage() {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Resetear a página 1 si cambian los filtros
+  // Resetear a página si cambian los filtros
   useEffect(() => {
     setPaginaActual(1);
   }, [debouncedSearch, mostrarInactivos]);
@@ -87,7 +84,7 @@ export default function UsuariosPage() {
   const totalUsuarios = data?.total || 0;
   const totalPaginas = Math.ceil(totalUsuarios / ITEMS_POR_PAGINA);
 
-  // 🌟 ACCIONES EXCEL PARA USUARIOS
+  // ACCIONES EXCEL
   const handleDescargarPlantilla = async () => {
     try {
       const columnasPlantilla = [
@@ -111,7 +108,7 @@ export default function UsuariosPage() {
     try {
       setImporting(true);
       
-      // Validamos los campos indispensables para crear un registro válido
+
       const columnasEsperadas = ['nombres', 'apellidos'];
       const datosCrudos = await importFromExcel(file, columnasEsperadas);
 
@@ -122,7 +119,7 @@ export default function UsuariosPage() {
         usuario_red_windows: fila['usuario_red_windows'] || null,
         anexo: fila['anexo'] ? String(fila['anexo']) : null,
         email_institucional: fila['email_institucional'] || null,
-        activo: true // Por defecto ingresan en estado activo
+        activo: true 
       }));
 
       const { error } = await supabase.from('usuarios').insert(datosParaSupabase);

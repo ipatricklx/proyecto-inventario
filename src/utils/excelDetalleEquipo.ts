@@ -5,7 +5,7 @@ export const exportarDetalleEquipoExcel = async (equipo: any, perifericos: any[]
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Ficha de Equipo');
 
-  // Ocultar líneas de cuadrícula por defecto para un look más limpio
+
   worksheet.views = [{ showGridLines: true }];
 
   // 1. TÍTULO PRINCIPAL

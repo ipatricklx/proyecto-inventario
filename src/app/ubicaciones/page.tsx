@@ -3,7 +3,6 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import useSWR from 'swr';
-// 🌟 Importamos los utilitarios de Excel (Agregado downloadExcelTemplate)
 import { exportToExcel, downloadExcelTemplate } from '@/utils/excelExport';
 import { importFromExcel } from '@/utils/excelImport';
 

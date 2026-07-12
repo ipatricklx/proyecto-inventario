@@ -18,18 +18,23 @@ import {
   AlertTriangle,
   XCircle,
   FileSpreadsheet, 
-  FileDown
+  FileDown,
+  FileSignature
 } from 'lucide-react'; 
 
 export default function DetallesEquipoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [equipo, setEquipo] = useState<any>(null);
   const [historial, setHistorial] = useState<any[]>([]);
-  // ✅ SOLUCIÓN: Agregamos el estado para los periféricos
   const [perifericos, setPerifericos] = useState<any[]>([]); 
   const [loading, setLoading] = useState(true);
   const [qrUrl, setQrUrl] = useState('');
   const qrRef = useRef<HTMLDivElement>(null);
+  const [showFupModal, setShowFupModal] = useState(false);
+  const [fupTramite, setFupTramite] = useState('Asignación');
+  const [fupDni, setFupDni] = useState('');
+  const [fupEmpresa, setFupEmpresa] = useState('');
+  const [fupDireccion, setFupDireccion] = useState('');
 
   useEffect(() => {
     getDatos();
@@ -170,7 +175,7 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
     a.click();
     window.URL.revokeObjectURL(url);
   };
-  // FORMATO PDF PROPIO CORREGIDO (CON LOGO, SIN HEADERS DE NAVEGADOR Y CON PERIFÉRICOS)
+  // FORMATO PDF
  const exportarAPDF = () => {
     if (!equipo) return;
 
@@ -436,6 +441,202 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
     `);
     win.document.close();
   };
+
+  // ====================================================
+  // NUEVA FUNCIÓN CORREGIDA: GENERAR FUP
+  // ====================================================
+  const generarFUP = () => {
+    if (!equipo) return;
+
+    const idString = String(id || equipo.id_equipo || '0');
+    const fechaHoy = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const correlativo = `FUP-${new Date().getFullYear()}-${idString.padStart(4, '0')}`;
+    
+    const isAsignacion = fupTramite === 'Asignación' ? 'X' : '&nbsp;&nbsp;';
+    const isMantenimiento = fupTramite === 'Salida por Mantenimiento' ? 'X' : '&nbsp;&nbsp;';
+    const isDevolucion = fupTramite === 'Acta de Devolución' ? 'X' : '&nbsp;&nbsp;';
+
+    // 3. Generar la tabla de Bienes
+    let filaItem = 1;
+    let bienesRows = `
+      <tr>
+        <td style="text-align: center;">${filaItem++}</td>
+        <td style="text-align: center;">${equipo.cod_patrimonio || 'S/N'}</td>
+        <td>${equipo.tipo_equipo || 'N/A'}</td>
+        <td style="text-align: center;">${equipo.marca || 'N/A'}</td>
+        <td style="text-align: center;">${equipo.numero_serie || 'N/A'}</td>
+        <td style="text-align: center;">${equipo.modelo || 'N/A'}</td>
+        <td style="text-align: center;">${equipo.estado || 'N/A'}</td>
+      </tr>
+    `;
+
+    // Validar que existan periféricos antes de recorrerlos
+    if (perifericos && perifericos.length > 0) {
+      perifericos.forEach(p => {
+        bienesRows += `
+          <tr>
+            <td style="text-align: center;">${filaItem++}</td>
+            <td style="text-align: center;">${p.cod_patrimonio_verde || p.cod_patrimonio_azul || 'S/N'}</td>
+            <td>${p.tipo_periferico || 'N/A'}</td>
+            <td style="text-align: center;">${p.marca || 'N/A'}</td>
+            <td style="text-align: center;">${p.n_serie || p.numero_serie || 'N/A'}</td>
+            <td style="text-align: center;">${p.modelo || 'N/A'}</td>
+            <td style="text-align: center;">${p.estado || 'Bueno'}</td>
+          </tr>
+        `;
+      });
+    }
+
+    // Rellenar filas en blanco para mantener el diseño
+    for(let i = filaItem; i <= 5; i++){
+       bienesRows += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+    }
+
+    // Variables de usuario seguras
+    const nombreUsuario = equipo.usuarios ? `${equipo.usuarios.apellidos || ''}, ${equipo.usuarios.nombres || ''}` : '---';
+    const codPlanilla = equipo.usuarios?.cod_planilla || '---';
+    const servicio = equipo.ubicaciones?.servicio || '---';
+    const area = equipo.ubicaciones?.area || '---';
+
+    // 4. Crear el HTML
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>FUP - ${correlativo}</title>
+          <style>
+            @page { size: A4 portrait; margin: 15mm; }
+            body { font-family: 'Arial', sans-serif; font-size: 11px; margin: 0; color: #000; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+            th, td { border: 1px solid #000; padding: 6px; vertical-align: middle; }
+            .header-title { font-weight: bold; font-size: 14px; text-align: center; }
+            .section-title { font-weight: bold; background-color: #e0e0e0; text-align: left; padding: 4px; }
+            .checkbox-box { display: inline-block; width: 14px; height: 14px; border: 1px solid #000; text-align: center; line-height: 14px; font-weight: bold; margin-right: 5px; }
+            .signatures { margin-top: 60px; width: 100%; border: none !important; }
+            .signatures td { border: none !important; text-align: center; vertical-align: bottom; height: 80px; }
+            .line { border-top: 1px solid #000; width: 80%; margin: 0 auto 5px auto; }
+            .notes { font-size: 9px; margin-top: 10px; }
+          </style>
+        </head>
+        <body>
+          <table>
+            <tr>
+              <td style="width: 25%; text-align:center; border-right:none;">
+                <strong>EsSalud</strong><br><span style="font-size:9px;">Seguridad Social para todos</span>
+              </td>
+              <td style="width: 50%; border-left:none; border-right:none; text-align:center;">
+                <div class="header-title">FORMULARIO ÚNICO PATRIMONIAL</div>
+                <div style="font-size:10px;">(Uso Interno)</div>
+              </td>
+              <td style="width: 25%; border-left:none; font-size:10px;">
+                <div>N°: <strong>${correlativo}</strong></div>
+                <div>Fecha: <strong>${fechaHoy}</strong></div>
+              </td>
+            </tr>
+          </table>
+
+          <table>
+            <tr><td colspan="3" class="section-title">I. MOTIVO DEL TRÁMITE</td></tr>
+            <tr>
+              <td><span class="checkbox-box">&nbsp;&nbsp;</span> Toma de Inventario</td>
+              <td><span class="checkbox-box">${isAsignacion}</span> Cuadro de Asignación</td>
+              <td><span class="checkbox-box">&nbsp;&nbsp;</span> Desplazamiento Interno</td>
+            </tr>
+            <tr>
+              <td><span class="checkbox-box">${isMantenimiento}</span> Salida por Mantenimiento (*)</td>
+              <td colspan="2"><span class="checkbox-box">${isDevolucion}</span> Acta de Devolución</td>
+            </tr>
+          </table>
+
+          <table>
+            <tr><td colspan="4" class="section-title">II. DATOS DEL ORIGEN / ASIGNACIÓN</td></tr>
+            <tr>
+              <td style="width: 18%; font-weight:bold;">Trabajador / Responsable:</td>
+              <td style="width: 32%;">${nombreUsuario}</td>
+              <td style="width: 18%; font-weight:bold;">Código Planilla / DNI:</td>
+              <td style="width: 32%;">${codPlanilla}</td>
+            </tr>
+            <tr>
+              <td style="font-weight:bold;">Dependencia / Servicio:</td>
+              <td>${servicio}</td>
+              <td style="font-weight:bold;">Ambiente / Área:</td>
+              <td>${area}</td>
+            </tr>
+          </table>
+
+          <table>
+            <tr><td colspan="7" class="section-title">III. DATOS DE LOS BIENES INFORMÁTICOS</td></tr>
+            <tr style="text-align:center; font-weight:bold; background-color:#f5f5f5;">
+              <td style="width:5%;">Ítem</td>
+              <td style="width:15%;">Cód. Patrimonial</td>
+              <td style="width:25%;">Descripción</td>
+              <td style="width:15%;">Marca</td>
+              <td style="width:15%;">Serie</td>
+              <td style="width:15%;">Modelo</td>
+              <td style="width:10%;">Estado</td>
+            </tr>
+            ${bienesRows}
+          </table>
+
+          <table>
+            <tr><td colspan="4" class="section-title">IV. DATOS DEL DESTINO EXTERNO / MANTENIMIENTO</td></tr>
+            <tr>
+              <td style="width: 25%; font-weight:bold;">DNI del Responsable de Traslado (*):</td>
+              <td style="width: 25%;">${fupDni || '---'}</td>
+              <td style="width: 25%; font-weight:bold;">Razón Social Empresa (**):</td>
+              <td style="width: 25%;">${fupEmpresa || '---'}</td>
+            </tr>
+            <tr>
+              <td style="font-weight:bold;">Dirección de la Empresa (***):</td>
+              <td colspan="3">${fupDireccion || '---'}</td>
+            </tr>
+          </table>
+
+          <div class="notes">
+            (*) En caso de usar Salida por Mantenimiento ingresar el número de DNI de la persona responsable del desplazamiento.<br>
+            (**) En caso de usar Salida por Mantenimiento ingresar la Razón Social de la Empresa que ejecutará el mantenimiento.<br>
+            (***) En caso de usar Salida por Mantenimiento ingresar la Dirección de la Empresa que ejecutará el mantenimiento.
+          </div>
+
+          <table class="signatures">
+            <tr>
+              <td>
+                <div class="line"></div>
+                <strong>Firma del Trabajador / Usuario</strong>
+              </td>
+              <td>
+                <div class="line"></div>
+                <strong>Jefe Inmediato de la Dependencia</strong>
+              </td>
+              <td>
+                <div class="line"></div>
+                <strong>Área de Soporte Informático</strong>
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>
+    `;
+
+    // 5. Escribir y Ejecutar Impresión de Forma Segura
+    const win = window.open('', '_blank', 'height=900,width=750');
+    if (win) {
+      win.document.open();
+      win.document.write(htmlContent);
+      win.document.close();
+      
+      // Cerrar el modal en tu pantalla original
+      setShowFupModal(false);
+
+      // Usar setTimeout asegurando que la ventana popup ejecute la impresión tras cargar el HTML
+      setTimeout(() => {
+        win.focus();
+        win.print();
+      }, 500);
+    } else {
+      alert("Por favor permite las ventanas emergentes (pop-ups) en tu navegador para generar el PDF.");
+    }
+  };
   // Impresión de stickers de inventario
   const handlePrintQR = () => {
     const printContent = qrRef.current?.innerHTML;
@@ -444,7 +645,7 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
       win?.document.write(`
         <html>
           <head>
-            <title>Sticker Inventario - MedTrack</title>
+            <title>Sticker Inventario</title>
             <style>
               body { 
                 display: flex; flex-direction: column; align-items: center; justify-content: center; 
@@ -485,6 +686,71 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="max-w-5xl mx-auto bg-gray-50 min-h-screen py-8 px-4 text-gray-900 animate-fadeIn print:bg-white print:p-0">
+      {showFupModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm print:hidden">
+          <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md animate-in fade-in zoom-in duration-200">
+            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <FileSignature className="w-6 h-6 text-indigo-600" />
+              Generar Formulario Patrimonial
+            </h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Motivo del Trámite</label>
+                <select 
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  value={fupTramite}
+                  onChange={(e) => {
+                    setFupTramite(e.target.value);
+                    if (e.target.value !== 'Salida por Mantenimiento') {
+                      setFupDni(''); setFupEmpresa(''); setFupDireccion('');
+                    }
+                  }}
+                >
+                  <option value="Asignación">Cuadro de Asignación / Entrega</option>
+                  <option value="Acta de Devolución">Acta de Devolución</option>
+                  <option value="Salida por Mantenimiento">Salida por Mantenimiento (Externo)</option>
+                </select>
+              </div>
+
+              {/* CAMPOS CONDICIONALES PARA MANTENIMIENTO */}
+              {fupTramite === 'Salida por Mantenimiento' && (
+                <div className="space-y-3 bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
+                  <p className="text-xs font-semibold text-indigo-800 uppercase tracking-wide">Datos Obligatorios de Salida</p>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">DNI Responsable Traslado (*)</label>
+                    <input type="text" className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm" value={fupDni} onChange={(e) => setFupDni(e.target.value)} placeholder="Ej. 12345678" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Razón Social Empresa (**)</label>
+                    <input type="text" className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm" value={fupEmpresa} onChange={(e) => setFupEmpresa(e.target.value)} placeholder="Nombre del Taller / Proveedor" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Dirección Empresa (***)</label>
+                    <input type="text" className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm" value={fupDireccion} onChange={(e) => setFupDireccion(e.target.value)} placeholder="Dirección exacta" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button 
+                onClick={() => setShowFupModal(false)}
+                className="px-4 py-2 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition"
+              >
+                Cancelar
+              </button>
+              {/* ESTE BOTÓN SÍ LLAMA A LA FUNCIÓN DE IMPRESIÓN */}
+              <button 
+                onClick={generarFUP}
+                className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition shadow-md"
+              >
+                Imprimir Documento
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* CABECERA WEB */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 print:hidden">
         <div>
@@ -511,6 +777,13 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
         
         {/* GRUPO DE BOTONES */}
         <div className="flex flex-wrap gap-2 shrink-0 w-full md:w-auto">
+          <button 
+          onClick={() => setShowFupModal(true)} 
+          className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl text-sm font-bold hover:bg-indigo-100 transition shadow-xs cursor-pointer"
+        >
+          <FileSignature className="w-4 h-4" />
+          <span className="hidden sm:inline">Generar FUP</span>
+        </button>
           <button onClick={exportarAExcel} className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-emerald-700 rounded-xl text-sm font-semibold hover:bg-emerald-50 transition shadow-xs cursor-pointer">
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> <span className="hidden sm:inline">Excel</span>
           </button>
@@ -655,11 +928,6 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
             </button>
           </div>
 
-          {/* BITÁCORA HISTÓRICA DE ESTADOS */}
-          <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs print:shadow-none print:border-gray-300 print:break-inside-avoid">
-            <h3 className="text-base font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2 print:border-gray-300">
-              <History className="w-5 h-5 text-gray-500 print:hidden" /> Bitácora Técnica
-            </h3>
             
             {historial.length === 0 ? (
               <p className="text-xs text-gray-400 italic text-center py-4 print:text-left">Sin novedades registradas.</p>
@@ -687,6 +955,5 @@ export default function DetallesEquipoPage({ params }: { params: Promise<{ id: s
         </div>
 
       </div>
-    </div>
-  );
+  )
 }

@@ -93,19 +93,41 @@ export default function PapeleraPerifericosPage() {
   };
 
   async function restaurarPeriferico(id: string, patrimonio: string) {
-    const confirmacion = window.confirm(`¿Deseas restaurar el periférico ${patrimonio || 'seleccionado'} al inventario activo?`);
+    const confirmacion = window.confirm(`¿Deseas restaurar el periférico ${patrimonio || 'seleccionado'} al inventario activo y cambiar su estado a OPERATIVO?`);
     if (!confirmacion) return;
 
-    const { error } = await supabase
+    const fechaActual = new Date().toISOString();
+
+    // 1. Quitar de la papelera y cambiar su estado físico a OPERATIVO
+    const { error: errorPeriferico } = await supabase
       .from('perifericos')
-      .update({ deleted_at: null })
+      .update({ 
+        deleted_at: null,
+        estado_fisico: 'OPERATIVO' // Cambia a 'estado' si tu columna se llama así
+      })
       .eq('id_periferico', id);
 
-    if (error) {
-      alert('Error al restaurar: ' + error.message);
-    } else {
-      cargarEliminados();
+    if (errorPeriferico) {
+      alert('Error al restaurar: ' + errorPeriferico.message);
+      return;
     }
+
+    // 2. Registrar la restauración en la tabla de historial estados_perifericos
+    const { error: errorHistorial } = await supabase
+      .from('estados_perifericos')
+      .insert([{
+        id_periferico: parseInt(id), // Convertimos a número si tu clave primaria es un entero
+        tipo_estado: 'OPERATIVO',
+        motivo: 'Periférico restaurado desde la papelera de reciclaje.',
+        fecha: fechaActual
+      }]);
+
+    if (errorHistorial) {
+      console.error('Error al guardar el historial de restauración:', errorHistorial.message);
+    }
+
+    // 3. Recargar la lista de la papelera
+    cargarEliminados();
   }
 
   async function eliminarDefinitivamente(id: string, patrimonio: string) {

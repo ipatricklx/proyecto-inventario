@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 export default function EditarUbicacionPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
-  const { id } = use(params); // Obtenemos el ID de la URL
+  const { id } = use(params);
   
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
